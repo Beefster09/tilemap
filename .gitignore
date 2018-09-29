@@ -1,0 +1,13 @@
+.vs/**
+x64/**
+*.exe
+*.ilk
+*.vcxproj*
+*.log
+*.tlog
+*.sln
+*.obj
+*.o
+*.idb
+*.pdb
+*.obj.enc
