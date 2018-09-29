@@ -58,6 +58,13 @@ int main(int argc, char* argv[]) {
 		{
 			glfwPollEvents();
 
+			if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
+				double mouse_x, mouse_y;
+				glfwGetCursorPos(window, &mouse_x, &mouse_y);
+				renderer.set_sharpness(mouse_x * 3 / screen_width);
+				printf("Scaling sharpness: %.3f\n", renderer.get_sharpness());
+			}
+
 			renderer.draw_frame();
 
 			if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {

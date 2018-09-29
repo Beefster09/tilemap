@@ -21,6 +21,8 @@ const unsigned int simple_tilemap[] = {
 	2|VFLIP, 0, rotateCW(2|VFLIP), 0, rotateCW(rotateCW(2|VFLIP)), 0, rotateCCW(2|VFLIP), 0,
 };
 
+extern int screen_width, screen_height;
+
 Renderer::Renderer(GLFWwindow* window, int width, int height): 
 	window(window),
 	tile_shader("shaders/tilechunk.vert", "shaders/tilechunk.frag"),
@@ -43,6 +45,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	tileset_slot = tile_shader.getSlot("tileset");
 	palette_slot = tile_shader.getSlot("palette");
 	chunk_size_slot = tile_shader.getSlot("chunk_size");
+	tile_size_slot = tile_shader.getSlot("tile_size");
 
 	tileset = load_tileset("assets/tileset24bit.png", 16);
 	palette = new Palette({
@@ -77,12 +80,14 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	framebuffer = new Texture(framebuf);
 
 	virtual_screen_slot = scale_shader.getSlot("virtual_screen");
+	sharpness_slot = scale_shader.getSlot("sharpness");
 
 	camera = glm::ortho(0.f, (float) width, 0.f, (float) height);
 }
 
 void Renderer::draw_frame() {
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glViewport(0, 0, v_width, v_height);
 	glClear(GL_COLOR_BUFFER_BIT);
 	logOpenGLErrors();
 
@@ -113,16 +118,18 @@ void Renderer::draw_frame() {
 	logOpenGLErrors();
 
 	// virtual resolution scaling
-
+	
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(2);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, screen_width, screen_height);
 	//glClear(GL_COLOR_BUFFER_BIT);
 	logOpenGLErrors();
 
 	scale_shader.use();
 	scale_shader.set(virtual_screen_slot, framebuffer);
+	scale_shader.set(sharpness_slot, max(scaling_sharpness, 0.f));
 
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);

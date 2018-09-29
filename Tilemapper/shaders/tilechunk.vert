@@ -7,9 +7,8 @@ layout (location = 2) in uint vert_cset;
 uniform vec2 offset;
 uniform mat4 camera;
 uniform mat4 transform;
-uniform int chunk_size;
-
-const int tile_size = 16;
+uniform int chunk_size = 4;
+uniform int tile_size = 16;
 
 out vec2 frag_pos;
 flat out uint frag_tile;

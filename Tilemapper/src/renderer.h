@@ -10,8 +10,8 @@ private:
 	GLuint vao, tile_vbo, tilemap_vbo, fbo;
 	Shader tile_shader, scale_shader;
 
-	int tileset_slot, palette_slot, chunk_size_slot;
-	int virtual_screen_slot;
+	int tileset_slot, palette_slot, chunk_size_slot, tile_size_slot;
+	int virtual_screen_slot, sharpness_slot;
 
 	Texture* tileset;
 	Palette* palette;
@@ -19,10 +19,18 @@ private:
 	Texture* framebuffer;
 
 	glm::mat4 camera;
+	float scaling_sharpness = 2.f;
 
 public:
 	Renderer(GLFWwindow* window, int width, int height);
 	void draw_frame();
+
+	inline void set_sharpness(float sharpness) {
+		scaling_sharpness = max(sharpness, 0.f);
+	}
+	inline float get_sharpness() {
+		return scaling_sharpness;
+	}
 };
 
 // tile flip masks
