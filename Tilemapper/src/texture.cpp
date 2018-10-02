@@ -120,7 +120,7 @@ Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int o
 
 		delete[] tile_data;
 		stbi_image_free(image_data);
-		return new Texture(tex_handle); // TODO? use an allocator and placement new?
+		return new Texture(tex_handle, GL_TEXTURE_2D_ARRAY); // TODO? use an allocator and placement new?
 	}
 	else {
 		printf("Unable to load texture '%s'\n", image_file);
@@ -158,7 +158,11 @@ int Texture::bind(int slot) {
 	glActiveTexture(GL_TEXTURE0 + slot);
 	logOpenGLErrors();
 	glBindTexture(type, tex_handle);
-	logOpenGLErrors();
+	if (logOpenGLErrors()) {
+		printf("Texture Handle: %d\n", tex_handle);
+		printf("Texture Slot: %d\n", slot);
+		printf("Texture type: %s\n", glEnumName(type));
+	};
 	return slot;
 }
 

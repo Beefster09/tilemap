@@ -45,14 +45,12 @@ int main(int argc, char* argv[]) {
 	glViewport(0, 0, screen_width, screen_height);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glClearColor(0.0f, 0.1f, 0.4f, 1.0f);
-
 	{
 		Renderer renderer(window, 512, 288);
+		//Renderer renderer(window, 32, 32);
+
+		float base_sharp = renderer.get_sharpness();
+		bool pressed = false;
 
 		while(!glfwWindowShouldClose(window))
 		{
@@ -61,8 +59,17 @@ int main(int argc, char* argv[]) {
 			if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
 				double mouse_x, mouse_y;
 				glfwGetCursorPos(window, &mouse_x, &mouse_y);
-				renderer.set_sharpness(mouse_x * 3 / screen_width);
+				if (!pressed) {
+					base_sharp = renderer.get_sharpness() - mouse_x / screen_width;
+					pressed = true;
+				}
+				else {
+					renderer.set_sharpness(mouse_x / screen_width + base_sharp);
+				}
 				printf("Scaling sharpness: %.3f\n", renderer.get_sharpness());
+			}
+			else {
+				pressed = false;
 			}
 
 			renderer.draw_frame();

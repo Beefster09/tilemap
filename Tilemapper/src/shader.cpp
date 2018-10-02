@@ -117,7 +117,7 @@ void Shader::printFullInterface() {
 		glGetActiveUniform(shaderProgram, index, sizeof(name), &len, &size, &type, name);
 		int slot = getSlot(name);
 		if (slot >= 0) {
-			printf("[Slot %d] %s %s;\n", slot, glTypeName(type), name);
+			printf("[Slot %d] %s %s;\n", slot, glslTypeName(type), name);
 		}
 	}
 }
@@ -136,11 +136,17 @@ int Shader::getSlot(const char* name) const {
 	return slot;
 }
 
-
 void Shader::set(int slot, int i) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform1i(slot, i);
+	logOpenGLErrors();
+}
+
+void Shader::setUint(int slot, unsigned int u) const {
+	if (slot < 0) return;
+	assert(activeProgram == shaderProgram);
+	glUniform1ui(slot, u);
 	logOpenGLErrors();
 }
 

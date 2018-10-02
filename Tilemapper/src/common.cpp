@@ -25,10 +25,11 @@ char* readFile(const char* filename) {
 	}
 }
 
-void _logOpenGLErrors(const char* caller, const char* file, int lineNo) {
+int _logOpenGLErrors(const char* caller, const char* file, int lineNo) {
 	GLenum err;
-	while((err = glGetError()) != GL_NO_ERROR)
-	{
+	int err_count = 0;
+	while((err = glGetError()) != GL_NO_ERROR) {
+		err_count ++;
 		const char* message = "???";
 		switch (err) {
 		case GL_INVALID_ENUM:  message = "Invalid Enum"; break;
@@ -52,9 +53,10 @@ void _logOpenGLErrors(const char* caller, const char* file, int lineNo) {
 		}
 		printf("**OPENGL ERROR** (%s: in %s, line %d) %s\n", file, caller, lineNo, message);
 	}
+	return err_count;
 }
 
-const char* glTypeName(GLenum type) {
+const char* glslTypeName(GLenum type) {
 	switch (type) {
 	case GL_FLOAT: return "float";
 	case GL_FLOAT_VEC2: return "vec2";
@@ -73,3 +75,18 @@ const char* glTypeName(GLenum type) {
 	default: return "???";
 	}
 }
+
+#define T(ENUM) case ENUM: return #ENUM
+const char* glEnumName(GLenum type) {
+	switch (type) {
+		T(GL_FLOAT);
+		T(GL_UNSIGNED_INT);
+		T(GL_INT);
+		T(GL_TEXTURE_2D);
+		T(GL_TEXTURE_2D_ARRAY);
+		T(GL_TEXTURE_RECTANGLE);
+		// There are more, but this is good enough for now.
+		default: return "???";
+	}
+}
+#undef T

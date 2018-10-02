@@ -16,8 +16,8 @@ const float tile_vertices[] = {
 
 const unsigned int simple_tilemap[] = {
 	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
-	2|VFLIP, 0, 2|HFLIP|VFLIP, 0, 2|DFLIP|VFLIP, 0, 2|HFLIP|DFLIP|VFLIP, 0,
-	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), 0, rotateCCW(2), 0,
+	2|VFLIP, 0, 2|HFLIP|VFLIP, DITHER, 2|DFLIP|VFLIP, DITHER|DITHER_PARITY, 2|HFLIP|DFLIP|VFLIP, 0,
+	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
 	2|VFLIP, 0, rotateCW(2|VFLIP), 0, rotateCW(rotateCW(2|VFLIP)), 0, rotateCCW(2|VFLIP), 0,
 };
 
@@ -46,6 +46,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	palette_slot = tile_shader.getSlot("palette");
 	chunk_size_slot = tile_shader.getSlot("chunk_size");
 	tile_size_slot = tile_shader.getSlot("tile_size");
+	flags_slot = tile_shader.getSlot("flags");
 
 	tileset = load_tileset("assets/tileset24bit.png", 16);
 	palette = new Palette({
@@ -81,13 +82,21 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 
 	virtual_screen_slot = scale_shader.getSlot("virtual_screen");
 	sharpness_slot = scale_shader.getSlot("sharpness");
+	letterbox_slot = scale_shader.getSlot("letterbox");
 
 	camera = glm::ortho(0.f, (float) width, 0.f, (float) height);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	logOpenGLErrors();
 }
 
 void Renderer::draw_frame() {
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glViewport(0, 0, v_width, v_height);
+	glClearColor(0.0f, 0.1f, 0.4f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	logOpenGLErrors();
 
@@ -97,6 +106,7 @@ void Renderer::draw_frame() {
 	tile_shader.set(chunk_size_slot, 4);
 	tile_shader.set(tileset_slot, tileset->bind(0));
 	tile_shader.set(palette_slot, palette->bind(1));
+	tile_shader.setUint(flags_slot, 1);
 	tile_shader.setTransform(glm::mat4(1.f));
 	tile_shader.setCamera(camera);
 
@@ -124,12 +134,22 @@ void Renderer::draw_frame() {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, screen_width, screen_height);
-	//glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(0.f, 0.f, 0.f, 1.f);
+	glClear(GL_COLOR_BUFFER_BIT);
 	logOpenGLErrors();
 
 	scale_shader.use();
-	scale_shader.set(virtual_screen_slot, framebuffer);
-	scale_shader.set(sharpness_slot, max(scaling_sharpness, 0.f));
+	scale_shader.set(virtual_screen_slot, framebuffer->bind(0));
+
+	// Determine the letterboxing ratio
+	float scale_x = (float) screen_width / (float) v_width;
+	float scale_y = (float) screen_height / (float) v_height;
+	float max_scale = max(scale_x, scale_y);
+
+	scale_shader.set(letterbox_slot, glm::vec2(
+		scale_y / max_scale, scale_x / max_scale
+	));
+	scale_shader.set(sharpness_slot, max(scaling_sharpness, 0.f) * max_scale / 5.f);
 
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
@@ -143,11 +163,11 @@ void Renderer::draw_frame() {
 	glfwSwapBuffers(window);
 }
 
-unsigned int rotateCW(unsigned int tile) {
+unsigned int rotateCCW(unsigned int tile) {
 	return vflip(transpose(tile));
 }
 
-unsigned int rotateCCW(unsigned int tile) {
+unsigned int rotateCW(unsigned int tile) {
 	return transpose(vflip(tile));
 }
 
@@ -161,4 +181,11 @@ unsigned int vflip(unsigned int tile) {
 
 unsigned int transpose(unsigned int tile) {
 	return tile ^ DFLIP;
+}
+
+unsigned int filter(unsigned int cset, float r, float g, float b) {
+	unsigned int red = (unsigned int) ((1.f - clamp(r)) * 31) << 27;
+	unsigned int green = (unsigned int) ((1.f - clamp(g)) * 31) << 22;
+	unsigned int blue = (unsigned int) ((1.f - clamp(b)) * 31) << 17;
+	return red | green | blue | (cset & 0x0001FFFF);
 }

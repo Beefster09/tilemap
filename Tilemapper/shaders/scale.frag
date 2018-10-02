@@ -7,8 +7,7 @@ uniform float sharpness = 2.0;
 
 out vec4 frag_color;
 
-float center (float pix_coord) {
-    // return pix_coord;
+float sharpen(float pix_coord) {
     float norm = (fract(pix_coord) - 0.5) * 2.0;
     float norm2 = norm * norm;
     return floor(pix_coord) + norm * pow(norm2, sharpness) / 2.0 + 0.5;
@@ -17,7 +16,13 @@ float center (float pix_coord) {
 void main() {
     vec2 vres = textureSize(virtual_screen, 0);
     frag_color = texture(virtual_screen, vec2(
-        center(frag_uv.x * vres.x) / vres.x,
-        center(frag_uv.y * vres.y) / vres.y
+        sharpen(frag_uv.x * vres.x) / vres.x,
+        sharpen(frag_uv.y * vres.y) / vres.y
     ));
+    // To visualize how this makes the grid:
+    // frag_color = vec4(
+    //     fract(sharpen(frag_uv.x * vres.x)),
+    //     fract(sharpen(frag_uv.y * vres.y)),
+    //     0.5, 1.0
+    // );
 }

@@ -10,8 +10,8 @@ private:
 	GLuint vao, tile_vbo, tilemap_vbo, fbo;
 	Shader tile_shader, scale_shader;
 
-	int tileset_slot, palette_slot, chunk_size_slot, tile_size_slot;
-	int virtual_screen_slot, sharpness_slot;
+	int tileset_slot, palette_slot, chunk_size_slot, tile_size_slot, flags_slot;
+	int virtual_screen_slot, sharpness_slot, letterbox_slot;
 
 	Texture* tileset;
 	Palette* palette;
@@ -39,9 +39,16 @@ constexpr unsigned int HFLIP = 0x80000000;
 constexpr unsigned int VFLIP = 0x40000000;
 constexpr unsigned int DFLIP = 0x20000000;
 
-inline unsigned int rotateCW(unsigned int tile = 0);
-inline unsigned int rotateCCW(unsigned int tile = 0);
-inline unsigned int hflip(unsigned int tile = 0);
-inline unsigned int vflip(unsigned int tile = 0);
-inline unsigned int transpose(unsigned int tile = 0);
+unsigned int rotateCW(unsigned int tile = 0);
+unsigned int rotateCCW(unsigned int tile = 0);
+unsigned int hflip(unsigned int tile = 0);
+unsigned int vflip(unsigned int tile = 0);
+unsigned int transpose(unsigned int tile = 0);
+
+// tile render modifiers
+
+constexpr unsigned int DITHER = 0x8000;
+constexpr unsigned int DITHER_PARITY = 0x4000;
+
+unsigned int filter(unsigned int cset, float r, float g, float b);
 
