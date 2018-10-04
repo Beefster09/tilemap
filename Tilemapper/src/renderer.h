@@ -33,22 +33,21 @@ public:
 	}
 };
 
-// tile flip masks
+// tile modifiers
 
-constexpr unsigned int HFLIP = 0x80000000;
-constexpr unsigned int VFLIP = 0x40000000;
-constexpr unsigned int DFLIP = 0x20000000;
+constexpr uint32_t HFLIP = 0x00080000;
+constexpr uint32_t VFLIP = 0x00040000;
+constexpr uint32_t DFLIP = 0x00020000;
 
-unsigned int rotateCW(unsigned int tile = 0);
-unsigned int rotateCCW(unsigned int tile = 0);
-unsigned int hflip(unsigned int tile = 0);
-unsigned int vflip(unsigned int tile = 0);
-unsigned int transpose(unsigned int tile = 0);
+uint32_t rotateCW(uint32_t tile = 0);
+uint32_t rotateCCW(uint32_t tile = 0);
+uint32_t hflip(uint32_t tile = 0);
+uint32_t vflip(uint32_t tile = 0);
+uint32_t transpose(uint32_t tile = 0);
+
+uint32_t dither(uint32_t tile, uint32_t x_mult, uint32_t y_mult, uint32_t mod = 2, bool parity = false);
 
 // tile render modifiers
 
-constexpr unsigned int DITHER = 0x8000;
-constexpr unsigned int DITHER_PARITY = 0x4000;
-
-unsigned int filter(unsigned int cset, float r, float g, float b);
+uint32_t filter(uint32_t cset, float r, float g, float b);
 

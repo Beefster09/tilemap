@@ -14,9 +14,9 @@ const float tile_vertices[] = {
 	1.f, 1.f,
 };
 
-const unsigned int simple_tilemap[] = {
+const uint32_t simple_tilemap[] = {
 	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
-	2|VFLIP, 0, 2|HFLIP|VFLIP, DITHER, 2|DFLIP|VFLIP, DITHER|DITHER_PARITY, 2|HFLIP|DFLIP|VFLIP, 0,
+	2|VFLIP, 0, 2|HFLIP|VFLIP, 0, 2|DFLIP|VFLIP, 0, 2|HFLIP|DFLIP|VFLIP, 0,
 	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
 	2|VFLIP, 0, rotateCW(2|VFLIP), 0, rotateCW(rotateCW(2|VFLIP)), 0, rotateCCW(2|VFLIP), 0,
 };
@@ -36,6 +36,15 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(tile_vertices), tile_vertices, GL_STATIC_DRAW);
 	logOpenGLErrors();
+
+	uint32_t simple_tilemap[128];
+	uint32_t *tile = simple_tilemap;
+	for (int mulx = 0; mulx < 8; mulx++) {
+		for (int muly = 0; muly < 8; muly++) {
+			*tile++ = dither(2, mulx, muly, mulx + muly + 1, true);
+			*tile++ = 0;
+		}
+	}
 
 	glGenBuffers(1, &tilemap_vbo); // TODO: separate into Chunk class/struct
 	glBindBuffer(GL_ARRAY_BUFFER, tilemap_vbo);
@@ -103,7 +112,7 @@ void Renderer::draw_frame() {
 	// Draw tilemaps
 
 	tile_shader.use();
-	tile_shader.set(chunk_size_slot, 4);
+	tile_shader.set(chunk_size_slot, 8);
 	tile_shader.set(tileset_slot, tileset->bind(0));
 	tile_shader.set(palette_slot, palette->bind(1));
 	tile_shader.setUint(flags_slot, 1);
@@ -124,7 +133,7 @@ void Renderer::draw_frame() {
 	logOpenGLErrors();
 
 	glBindVertexArray(vao);
-	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 16);
+	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 64);
 	logOpenGLErrors();
 
 	// virtual resolution scaling
@@ -163,29 +172,35 @@ void Renderer::draw_frame() {
 	glfwSwapBuffers(window);
 }
 
-unsigned int rotateCCW(unsigned int tile) {
+uint32_t rotateCCW(uint32_t tile) {
 	return vflip(transpose(tile));
 }
 
-unsigned int rotateCW(unsigned int tile) {
+uint32_t rotateCW(uint32_t tile) {
 	return transpose(vflip(tile));
 }
 
-unsigned int hflip(unsigned int tile) {
+uint32_t hflip(uint32_t tile) {
 	return tile ^ ((tile & DFLIP) ? VFLIP : HFLIP);
 }
 
-unsigned int vflip(unsigned int tile) {
+uint32_t vflip(uint32_t tile) {
 	return tile ^ ((tile & DFLIP)? HFLIP : VFLIP);
 }
 
-unsigned int transpose(unsigned int tile) {
+uint32_t transpose(uint32_t tile) {
 	return tile ^ DFLIP;
 }
 
-unsigned int filter(unsigned int cset, float r, float g, float b) {
-	unsigned int red = (unsigned int) ((1.f - clamp(r)) * 31) << 27;
-	unsigned int green = (unsigned int) ((1.f - clamp(g)) * 31) << 22;
-	unsigned int blue = (unsigned int) ((1.f - clamp(b)) * 31) << 17;
-	return red | green | blue | (cset & 0x0001FFFF);
+uint32_t dither(uint32_t tile, uint32_t x_mult, uint32_t y_mult, uint32_t mod, bool parity) {
+	assert(x_mult < 8 && y_mult < 8 && mod <= 32 && mod > 0);
+	return (x_mult << 29) | (y_mult << 26) | ((mod - 1) << 21) | (parity * 0x00100000u) | (tile & 0x000FFFFF);
 }
+
+uint32_t filter(uint32_t cset, float r, float g, float b) {
+	uint32_t red = (uint32_t) ((1.f - clamp(r)) * 63) << 26;
+	uint32_t green = (uint32_t) ((1.f - clamp(g)) * 63) << 20;
+	uint32_t blue = (uint32_t) ((1.f - clamp(b)) * 63) << 14;
+	return red | green | blue | (cset & 0x00003FFF);
+}
+
