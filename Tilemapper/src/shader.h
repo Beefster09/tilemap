@@ -19,7 +19,8 @@ private:
 	int cameraSlot;
 
 public:
-	Shader(const char* vertexShaderFile, const char* fragmentShaderFile);
+	//Shader(const char* vertexShaderFile, const char* fragmentShaderFile);
+	Shader(GLuint shaderID, const char* vert_src, const char* frag_src);
 	Shader(Shader&& other);
 	Shader(const Shader& other) = delete;
 	Shader() = default;

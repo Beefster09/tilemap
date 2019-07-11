@@ -94,13 +94,13 @@ GLuint compileShaderFromFiles(const char* vertexShaderFile, const char* fragment
 
 GLuint Shader::activeProgram = -1;
 
-Shader::Shader(const char* vertexShaderFile, const char* fragmentShaderFile) {
-	shaderProgram = compileShaderFromFiles(vertexShaderFile, fragmentShaderFile);
+Shader::Shader(GLuint shaderID, const char* vert_src, const char* frag_src) {
+	shaderProgram = shaderID; //compileShaderFromFiles(vert, frag);
 	transformSlot = getSlot("transform");
 	cameraSlot = getSlot("camera");
 
 #ifndef NDEBUG
-	printf("Shader [Vertex] %s -> [Fragment] %s\n", vertexShaderFile, fragmentShaderFile);
+	printf("Shader [Vertex] %s -> [Fragment] %s\n", vert_src, frag_src);
 	printFullInterface();
 	printf("\n");
 #endif

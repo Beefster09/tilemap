@@ -17,6 +17,7 @@ flat out uint frag_cset;
 flat out vec4 color_filter;
 flat out uvec2 dither_mult;
 flat out uint dither_modulus;
+flat out uint dither_phase;
 flat out uint dither_parity;
 
 const uint HFLIP = 0x00080000u;
@@ -36,11 +37,12 @@ C: colorset index (0-255)
 
 /*
 tile packing:
-XXXY YYMM - MMMP HVDT - TTTT TTTT - TTTT TTTT
+XXYY MMMP - PPK? HVDT - TTTT TTTT - TTTT TTTT
 X: Dither X multiplier
 Y: Dither Y multiplier
-M: Dither modulus
-P: Dither parity (== or != 0)
+M: Dither modulus - 1
+P: Dither phase
+K: Dither parity (== or != 0)
 H: Horizontal flip
 V: Vertical flip
 D: Diagonal flip (transposes x and y)
@@ -48,10 +50,12 @@ T: Tile index
 */
 
 void main() {
-    vec2 world_pos = vec2(
-        (vert_pos.x + float(gl_InstanceID % chunk_size)) * float(tile_size) + offset.x,
-        (vert_pos.y + float(gl_InstanceID / chunk_size)) * float(tile_size) + offset.y
-    );
+    // vec2 world_pos = vec2(
+    //     (vert_pos.x + float(gl_InstanceID % chunk_size)) * float(tile_size) + offset.x,
+    //     (vert_pos.y + float(gl_InstanceID / chunk_size)) * float(tile_size) + offset.y
+    // );
+    vec2 norm_pos = vec2(float(gl_InstanceID % chunk_size), float(gl_InstanceID / chunk_size));
+    vec2 world_pos = (vert_pos + norm_pos) * float(tile_size) + offset;
     if ((vert_tile & TILE_MASK) == 0u) { // tile 0 is reserved as no-display
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }
@@ -68,11 +72,12 @@ void main() {
         1.0 - float((vert_cset & 0x00003F00u) >> 8u) / 63.0
     );
     dither_mult = uvec2(
-        ((vert_tile & 0xE0000000u) >> 29u),
-        ((vert_tile & 0x1C000000u) >> 26u)
+        ((vert_tile & 0xC0000000u) >> 30u),
+        ((vert_tile & 0x30000000u) >> 28u)
     );
-    dither_modulus = ((vert_tile & 0x03E00000u) >> 21u) + 1u;
-    dither_parity = uint((vert_tile & 0x00100000u) != 0u);
+    dither_modulus = ((vert_tile & 0x0E000000u) >> 25u) + 1u;
+    dither_phase   = ((vert_tile & 0x01C00000u) >> 22u);
+    dither_parity = uint((vert_tile & 0x00200000u) != 0u);
     vec2 uv = bool(DFLIP & vert_tile)? vert_pos.yx : vert_pos.xy;
     frag_uv = vec2( // top 2 bits can be used to flip
         bool(HFLIP & vert_tile)? 1.0 - uv.x : uv.x,

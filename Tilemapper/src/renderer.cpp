@@ -1,4 +1,4 @@
-#include <glad/glad.h> 
+#include <glad/glad.h>
 #include <glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -14,7 +14,7 @@ const float tile_vertices[] = {
 	1.f, 1.f,
 };
 
-const uint32_t simple_tilemap[] = {
+const u32 simple_tilemap[] = {
 	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
 	2|VFLIP, 0, 2|HFLIP|VFLIP, 0, 2|DFLIP|VFLIP, 0, 2|HFLIP|DFLIP|VFLIP, 0,
 	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
@@ -23,11 +23,69 @@ const uint32_t simple_tilemap[] = {
 
 extern int screen_width, screen_height;
 
-Renderer::Renderer(GLFWwindow* window, int width, int height): 
-	window(window),
-	tile_shader("shaders/tilechunk.vert", "shaders/tilechunk.frag"),
-	scale_shader("shaders/scale.vert", "shaders/scale.frag")
+#ifdef NO_EMBED_SHADERS
+
+#define COMPILE_SHADER(V, F) compileShaderFromFiles((V), (F))
+#define TILECHUNK_VERT_SHADER = "shaders/tilechunk.vert"
+#define TILECHUNK_VERT_SHADER = "shaders/tilechunk.frag"
+#define SCALE_VERT_SHADER = "shaders/scale.vert"
+#define SCALE_VERT_SHADER = "shaders/scale.frag"
+
+#define TILECHUNK_VERT_SHADER__SRC = "tilechunk.vert"
+#define TILECHUNK_VERT_SHADER__SRC = "tilechunk.frag"
+#define SCALE_VERT_SHADER__SRC = "scale.vert"
+#define SCALE_VERT_SHADER__SRC = "scale.frag"
+
+#else
+
+#define COMPILE_SHADER(V, F) compileShader((V), (F))
+#include "shaders__generated.h"
+
+#endif
+
+#define __SHADER(S) COMPILE_SHADER(S ## _VERT_SHADER, S ## _FRAG_SHADER), S ## _VERT_SHADER__SRC, S ## _FRAG_SHADER__SRC
+#define __SHADER2(V, F) COMPILE_SHADER(V ## _VERT_SHADER, F ## _FRAG_SHADER), V ## _VERT_SHADER__SRC, F ## _FRAG_SHADER__SRC
+
+
+TileChunk::TileChunk(Texture* tileset, u32* tilemap, u32 width, u32 height):
+	tileset(tileset),
+	tilemap(tilemap),
+	width(width),
+	height(height),
+	vbo(0)
 {
+	glGenBuffers(1, const_cast<GLuint*>(&vbo));
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(tilemap) * width * height, tilemap, GL_DYNAMIC_DRAW);
+	logOpenGLErrors();
+}
+
+
+TileChunk::~TileChunk() {
+	glDeleteBuffers(1, &vbo);
+}
+
+void TileChunk::sync() {
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(tilemap) * width * height, tilemap);
+}
+
+
+Renderer::Renderer(GLFWwindow* window, int width, int height):
+	window(window),
+	tile_shader(__SHADER(TILECHUNK)),
+	scale_shader(__SHADER(SCALE))
+{
+	tileset_slot = tile_shader.getSlot("tileset");
+	palette_slot = tile_shader.getSlot("palette");
+	chunk_size_slot = tile_shader.getSlot("chunk_size");
+	tile_size_slot = tile_shader.getSlot("tile_size");
+	flags_slot = tile_shader.getSlot("flags");
+
+	virtual_screen_slot = scale_shader.getSlot("virtual_screen");
+	sharpness_slot = scale_shader.getSlot("sharpness");
+	letterbox_slot = scale_shader.getSlot("letterbox");
+
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
 	logOpenGLErrors();
@@ -37,25 +95,22 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glBufferData(GL_ARRAY_BUFFER, sizeof(tile_vertices), tile_vertices, GL_STATIC_DRAW);
 	logOpenGLErrors();
 
-	uint32_t simple_tilemap[128];
-	uint32_t *tile = simple_tilemap;
-	for (int mulx = 0; mulx < 8; mulx++) {
-		for (int muly = 0; muly < 8; muly++) {
-			*tile++ = dither(2, mulx, muly, mulx + muly + 1, true);
+	u32 simple_tilemap[128];
+	u32 *tile = simple_tilemap;
+	for (int mulx = 0; mulx < 4; mulx++) {
+		for (int muly = 0; muly < 4; muly++) {
+			*tile++ = dither(2, mulx, muly, 2, 0);
+			*tile++ = 0;
+			*tile++ = dither(2, mulx, muly, 2, 1);
+			*tile++ = 0;
+			*tile++ = dither(2, mulx, muly, 4, 0);
+			*tile++ = 0;
+			*tile++ = dither(2, mulx, muly, 4, 1);
 			*tile++ = 0;
 		}
 	}
 
-	glGenBuffers(1, &tilemap_vbo); // TODO: separate into Chunk class/struct
-	glBindBuffer(GL_ARRAY_BUFFER, tilemap_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(simple_tilemap), simple_tilemap, GL_DYNAMIC_DRAW);
-	logOpenGLErrors();
-
-	tileset_slot = tile_shader.getSlot("tileset");
-	palette_slot = tile_shader.getSlot("palette");
-	chunk_size_slot = tile_shader.getSlot("chunk_size");
-	tile_size_slot = tile_shader.getSlot("tile_size");
-	flags_slot = tile_shader.getSlot("flags");
+	
 
 	tileset = load_tileset("assets/tileset24bit.png", 16);
 	palette = new Palette({
@@ -88,10 +143,6 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
 	logOpenGLErrors();
 	framebuffer = new Texture(framebuf);
-
-	virtual_screen_slot = scale_shader.getSlot("virtual_screen");
-	sharpness_slot = scale_shader.getSlot("sharpness");
-	letterbox_slot = scale_shader.getSlot("letterbox");
 
 	camera = glm::ortho(0.f, (float) width, 0.f, (float) height);
 
@@ -137,7 +188,7 @@ void Renderer::draw_frame() {
 	logOpenGLErrors();
 
 	// virtual resolution scaling
-	
+
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(2);
 
@@ -172,35 +223,35 @@ void Renderer::draw_frame() {
 	glfwSwapBuffers(window);
 }
 
-uint32_t rotateCCW(uint32_t tile) {
+u32 rotateCCW(u32 tile) {
 	return vflip(transpose(tile));
 }
 
-uint32_t rotateCW(uint32_t tile) {
+u32 rotateCW(u32 tile) {
 	return transpose(vflip(tile));
 }
 
-uint32_t hflip(uint32_t tile) {
+u32 hflip(u32 tile) {
 	return tile ^ ((tile & DFLIP) ? VFLIP : HFLIP);
 }
 
-uint32_t vflip(uint32_t tile) {
+u32 vflip(u32 tile) {
 	return tile ^ ((tile & DFLIP)? HFLIP : VFLIP);
 }
 
-uint32_t transpose(uint32_t tile) {
+u32 transpose(u32 tile) {
 	return tile ^ DFLIP;
 }
 
-uint32_t dither(uint32_t tile, uint32_t x_mult, uint32_t y_mult, uint32_t mod, bool parity) {
-	assert(x_mult < 8 && y_mult < 8 && mod <= 32 && mod > 0);
-	return (x_mult << 29) | (y_mult << 26) | ((mod - 1) << 21) | (parity * 0x00100000u) | (tile & 0x000FFFFF);
+u32 dither(u32 tile, u32 x_mult, u32 y_mult, u32 mod, u32 phase, bool parity) {
+	assert(x_mult < 4 && y_mult < 4 && mod <= 8 && mod > 0 && phase < 8);
+	return (x_mult << 30) | (y_mult << 28) | ((mod - 1) << 25) | (phase << 22) | (parity * 0x00200000u) | (tile & 0x000FFFFF);
 }
 
-uint32_t filter(uint32_t cset, float r, float g, float b) {
-	uint32_t red = (uint32_t) ((1.f - clamp(r)) * 63) << 26;
-	uint32_t green = (uint32_t) ((1.f - clamp(g)) * 63) << 20;
-	uint32_t blue = (uint32_t) ((1.f - clamp(b)) * 63) << 14;
+u32 filter(u32 cset, float r, float g, float b) {
+	u32 red = (u32) ((1.f - clamp(r)) * 63) << 26;
+	u32 green = (u32) ((1.f - clamp(g)) * 63) << 20;
+	u32 blue = (u32) ((1.f - clamp(b)) * 63) << 14;
 	return red | green | blue | (cset & 0x00003FFF);
 }
 

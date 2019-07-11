@@ -7,6 +7,7 @@ flat in uint frag_cset;
 flat in vec4 color_filter;
 flat in uvec2 dither_mult;
 flat in uint dither_modulus;
+flat in uint dither_phase;
 flat in uint dither_parity;
 
 uniform usampler2DArray tileset;
@@ -22,7 +23,7 @@ void main() {
     uvec2 dither = uvec2(frag_pos) * dither_mult;
     if (
         (color_index == 0u && (flags & SHOW_COLOR0) == 0u)
-        || (((dither.x + dither.y) % dither_modulus == 0u) == bool(dither_parity))
+        || (((dither.x + dither.y) % dither_modulus == dither_phase) == bool(dither_parity))
     ) discard;
     frag_color = vec4(texelFetch(palette, ivec2(color_index, frag_cset)).rgb, 1.0) * color_filter;
 }
