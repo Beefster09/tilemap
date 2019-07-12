@@ -9,6 +9,7 @@ uniform mat4 camera;
 uniform mat4 transform;
 uniform int chunk_size = 4;
 uniform int tile_size = 16;
+uniform float layer = 0.0;
 
 out vec2 frag_pos;
 out vec2 frag_uv;
@@ -50,17 +51,13 @@ T: Tile index
 */
 
 void main() {
-    // vec2 world_pos = vec2(
-    //     (vert_pos.x + float(gl_InstanceID % chunk_size)) * float(tile_size) + offset.x,
-    //     (vert_pos.y + float(gl_InstanceID / chunk_size)) * float(tile_size) + offset.y
-    // );
     vec2 norm_pos = vec2(float(gl_InstanceID % chunk_size), float(gl_InstanceID / chunk_size));
     vec2 world_pos = (vert_pos + norm_pos) * float(tile_size) + offset;
     if ((vert_tile & TILE_MASK) == 0u) { // tile 0 is reserved as no-display
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     }
     else {
-        gl_Position = camera * vec4(world_pos, 0.0, 1.0);
+        gl_Position = camera * vec4(world_pos, layer, 1.0);
     }
     frag_pos = world_pos;
     frag_tile = (vert_tile & TILE_MASK) - 1u;

@@ -1,8 +1,15 @@
+
+#include <vector>
+#include <algorithm>
+
 #include <glad/glad.h>
 #include <glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "renderer.h"
+
+constexpr int SANE_CHUNK_MAX = 64;
+constexpr int SANE_SPRITE_MAX = 512;
 
 const float tile_vertices[] = {
 	0.f, 0.f,
@@ -12,13 +19,6 @@ const float tile_vertices[] = {
 	0.f, 1.f,
 	1.f, 0.f,
 	1.f, 1.f,
-};
-
-const u32 simple_tilemap[] = {
-	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
-	2|VFLIP, 0, 2|HFLIP|VFLIP, 0, 2|DFLIP|VFLIP, 0, 2|HFLIP|DFLIP|VFLIP, 0,
-	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
-	2|VFLIP, 0, rotateCW(2|VFLIP), 0, rotateCW(rotateCW(2|VFLIP)), 0, rotateCCW(2|VFLIP), 0,
 };
 
 extern int screen_width, screen_height;
@@ -47,7 +47,7 @@ extern int screen_width, screen_height;
 #define __SHADER2(V, F) COMPILE_SHADER(V ## _VERT_SHADER, F ## _FRAG_SHADER), V ## _VERT_SHADER__SRC, F ## _FRAG_SHADER__SRC
 
 
-TileChunk::TileChunk(Texture* tileset, u32* tilemap, u32 width, u32 height):
+TileChunk::TileChunk(Texture* const tileset, Tile* const tilemap, u32 width, u32 height):
 	tileset(tileset),
 	tilemap(tilemap),
 	width(width),
@@ -70,21 +70,38 @@ void TileChunk::sync() {
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(tilemap) * width * height, tilemap);
 }
 
+void Renderer::_sort_chunks() {
+	chunks.fill_index(chunk_order);
+	std::stable_sort(chunk_order.begin(), chunk_order.end(), [&](int left, int right) {
+		return chunks[left].layer < chunks[right].layer;
+	});
+}
 
+ChunkID Renderer::add_chunk(const TileChunk* const chunk, float x, float y, i32 layer) {
+	return chunks.add(ChunkEntry{chunk, x, y, layer});
+}
+
+bool Renderer::remove_chunk(const ChunkID id) {
+	return chunks.remove(id);
+}
+
+
+#define __SLOT(VAR) (VAR ## _slot) = __S.getSlot(#VAR)
 Renderer::Renderer(GLFWwindow* window, int width, int height):
 	window(window),
 	tile_shader(__SHADER(TILECHUNK)),
-	scale_shader(__SHADER(SCALE))
+	scale_shader(__SHADER(SCALE)),
+	chunks(SANE_CHUNK_MAX),
+	sprites(SANE_SPRITE_MAX)
 {
-	tileset_slot = tile_shader.getSlot("tileset");
-	palette_slot = tile_shader.getSlot("palette");
-	chunk_size_slot = tile_shader.getSlot("chunk_size");
-	tile_size_slot = tile_shader.getSlot("tile_size");
-	flags_slot = tile_shader.getSlot("flags");
+	chunk_order.reserve(SANE_CHUNK_MAX);
 
-	virtual_screen_slot = scale_shader.getSlot("virtual_screen");
-	sharpness_slot = scale_shader.getSlot("sharpness");
-	letterbox_slot = scale_shader.getSlot("letterbox");
+#define __S tile_shader
+#include "tilechunk_uniforms__generated.h"
+#undef __S
+
+#define __S scale_shader
+#include "scale_uniforms__generated.h"
 
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
@@ -95,24 +112,6 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glBufferData(GL_ARRAY_BUFFER, sizeof(tile_vertices), tile_vertices, GL_STATIC_DRAW);
 	logOpenGLErrors();
 
-	u32 simple_tilemap[128];
-	u32 *tile = simple_tilemap;
-	for (int mulx = 0; mulx < 4; mulx++) {
-		for (int muly = 0; muly < 4; muly++) {
-			*tile++ = dither(2, mulx, muly, 2, 0);
-			*tile++ = 0;
-			*tile++ = dither(2, mulx, muly, 2, 1);
-			*tile++ = 0;
-			*tile++ = dither(2, mulx, muly, 4, 0);
-			*tile++ = 0;
-			*tile++ = dither(2, mulx, muly, 4, 1);
-			*tile++ = 0;
-		}
-	}
-
-	
-
-	tileset = load_tileset("assets/tileset24bit.png", 16);
 	palette = new Palette({
 		{
 			{30, 40, 50},
@@ -138,6 +137,8 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	logOpenGLErrors();
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
@@ -163,8 +164,6 @@ void Renderer::draw_frame() {
 	// Draw tilemaps
 
 	tile_shader.use();
-	tile_shader.set(chunk_size_slot, 8);
-	tile_shader.set(tileset_slot, tileset->bind(0));
 	tile_shader.set(palette_slot, palette->bind(1));
 	tile_shader.setUint(flags_slot, 1);
 	tile_shader.setTransform(glm::mat4(1.f));
@@ -174,18 +173,27 @@ void Renderer::draw_frame() {
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glEnableVertexAttribArray(0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, tilemap_vbo);
-	glVertexAttribIPointer(1, 1, GL_INT, sizeof(int) * 2, 0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribDivisor(1, 1);
-	glVertexAttribIPointer(2, 1, GL_INT, sizeof(int) * 2, (void*) sizeof(int));
-	glEnableVertexAttribArray(2);
-	glVertexAttribDivisor(2, 1);
-	logOpenGLErrors();
+	_sort_chunks();
+	auto end = chunk_order.end();
+	for (auto it = chunk_order.begin(); it != end; it++) {
+		auto& chunk = chunks[*it].chunk;
+		tile_shader.set(tileset_slot, chunk->tileset->bind(0));
+		tile_shader.set(chunk_size_slot, (int) chunk->width);
+		tile_shader.set(offset_slot, chunks[*it].x, chunks[*it].y);
 
-	glBindVertexArray(vao);
-	glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 64);
-	logOpenGLErrors();
+		glBindBuffer(GL_ARRAY_BUFFER, chunk->vbo);
+		glVertexAttribIPointer(1, 1, GL_INT, sizeof(Tile), 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribDivisor(1, 1);
+		glVertexAttribIPointer(2, 1, GL_INT, sizeof(Tile), (void*) sizeof(Tile::tile));
+		glEnableVertexAttribArray(2);
+		glVertexAttribDivisor(2, 1);
+		logOpenGLErrors();
+
+		glBindVertexArray(vao);
+		glDrawArraysInstanced(GL_TRIANGLES, 0, 6, chunk->width * chunk->height);
+		logOpenGLErrors();
+	}
 
 	// virtual resolution scaling
 

@@ -157,6 +157,13 @@ void Shader::set(int slot, float f) const {
 	logOpenGLErrors();
 }
 
+void Shader::set(int slot, float x, float y) const {
+	if (slot < 0) return;
+	assert(activeProgram == shaderProgram);
+	glUniform2f(slot, x, y);
+	logOpenGLErrors();
+}
+
 void Shader::set(int slot, glm::vec2 vec) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);

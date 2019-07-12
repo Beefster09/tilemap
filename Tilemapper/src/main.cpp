@@ -11,6 +11,13 @@ int screen_width = 512 * 2;
 //int screen_height = 720;
 int screen_height = 288 * 2;
 
+Tile simple_tilemap[] = {
+	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
+	2|VFLIP, 0, 2|HFLIP|VFLIP, 0, 2|DFLIP|VFLIP, 0, 2|HFLIP|DFLIP|VFLIP, 0,
+	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
+	2|VFLIP, 0, rotateCW(2|VFLIP), 0, rotateCW(rotateCW(2|VFLIP)), 0, rotateCCW(2|VFLIP), 0,
+};
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	screen_width = width;
 	screen_height = height;
@@ -48,6 +55,15 @@ int main(int argc, char* argv[]) {
 	{
 		Renderer renderer(window, 512, 288);
 		//Renderer renderer(window, 32, 32);
+
+		auto tileset = load_tileset("assets/tileset24bit.png", 16);
+		TileChunk test_chunk(tileset, simple_tilemap, 4, 4);
+		renderer.add_chunk(&test_chunk, 8, 8, 0);
+		renderer.add_chunk(&test_chunk, 64, 24, -2);
+		renderer.add_chunk(&test_chunk, 60, 20, -2);
+		renderer.add_chunk(&test_chunk, 96, 16, -3);
+		renderer.add_chunk(&test_chunk, 125, 35, 2);
+		renderer.add_chunk(&test_chunk, 24, 48, 2);
 
 		float base_sharp = renderer.get_sharpness();
 		bool pressed = false;

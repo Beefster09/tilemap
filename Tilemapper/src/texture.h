@@ -27,7 +27,7 @@ public:
 Texture* load_tileset(const char* image_file, int tile_size, int offset_x = 0, int offset_y = 0, int spacing_x = 0, int spacing_y = 0);
 
 struct Color {
-	uint8_t r, g, b;
+	u8 r, g, b;
 };
 
 class Palette {

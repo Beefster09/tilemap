@@ -38,6 +38,7 @@ public:
 	void set(int slot, int i) const;
 	void setUint(int slot, unsigned int u) const;
 	void set(int slot, float f) const;
+	void set(int slot, float x, float y) const;
 	void set(int slot, glm::vec2 vec) const;
 	void set(int slot, glm::vec3 vec) const;
 	void set(int slot, glm::vec4 vec) const;
