@@ -1,5 +1,4 @@
 
-#include <vector>
 #include <algorithm>
 
 #include <glad/glad.h>
@@ -8,17 +7,14 @@
 
 #include "renderer.h"
 
-constexpr int SANE_CHUNK_MAX = 64;
+constexpr int CHUNK_MAX = 64;
 constexpr int SANE_SPRITE_MAX = 512;
 
 const float tile_vertices[] = {
 	0.f, 0.f,
 	0.f, 1.f,
-	1.f, 0.f,
-
-	0.f, 1.f,
-	1.f, 0.f,
 	1.f, 1.f,
+	1.f, 0.f,
 };
 
 extern int screen_width, screen_height;
@@ -47,55 +43,14 @@ extern int screen_width, screen_height;
 #define __SHADER2(V, F) COMPILE_SHADER(V ## _VERT_SHADER, F ## _FRAG_SHADER), V ## _VERT_SHADER__SRC, F ## _FRAG_SHADER__SRC
 
 
-TileChunk::TileChunk(Texture* const tileset, Tile* const tilemap, u32 width, u32 height):
-	tileset(tileset),
-	tilemap(tilemap),
-	width(width),
-	height(height),
-	vbo(0)
-{
-	glGenBuffers(1, const_cast<GLuint*>(&vbo));
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(tilemap) * width * height, tilemap, GL_DYNAMIC_DRAW);
-	logOpenGLErrors();
-}
-
-
-TileChunk::~TileChunk() {
-	glDeleteBuffers(1, &vbo);
-}
-
-void TileChunk::sync() {
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(tilemap) * width * height, tilemap);
-}
-
-void Renderer::_sort_chunks() {
-	chunks.fill_index(chunk_order);
-	std::stable_sort(chunk_order.begin(), chunk_order.end(), [&](int left, int right) {
-		return chunks[left].layer < chunks[right].layer;
-	});
-}
-
-ChunkID Renderer::add_chunk(const TileChunk* const chunk, float x, float y, i32 layer) {
-	return chunks.add(ChunkEntry{chunk, x, y, layer});
-}
-
-bool Renderer::remove_chunk(const ChunkID id) {
-	return chunks.remove(id);
-}
-
-
 #define __SLOT(VAR) (VAR ## _slot) = __S.getSlot(#VAR)
 Renderer::Renderer(GLFWwindow* window, int width, int height):
 	window(window),
 	tile_shader(__SHADER(TILECHUNK)),
 	scale_shader(__SHADER(SCALE)),
-	chunks(SANE_CHUNK_MAX),
+	chunks(CHUNK_MAX),
 	sprites(SANE_SPRITE_MAX)
 {
-	chunk_order.reserve(SANE_CHUNK_MAX);
-
 #define __S tile_shader
 #include "tilechunk_uniforms__generated.h"
 #undef __S
@@ -105,12 +60,10 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
-	logOpenGLErrors();
 
 	glGenBuffers(1, &tile_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(tile_vertices), tile_vertices, GL_STATIC_DRAW);
-	logOpenGLErrors();
 
 	palette = new Palette({
 		{
@@ -126,12 +79,10 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 
 	glGenFramebuffers(1, &fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	logOpenGLErrors();
 
 	GLuint framebuf;
 	glGenTextures(1, &framebuf);
 	glBindTexture(GL_TEXTURE_2D, framebuf);
-	logOpenGLErrors();
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
@@ -139,10 +90,8 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	logOpenGLErrors();
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
-	logOpenGLErrors();
 	framebuffer = new Texture(framebuf);
 
 	camera = glm::ortho(0.f, (float) width, 0.f, (float) height);
@@ -151,15 +100,17 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
-	logOpenGLErrors();
 }
 
-void Renderer::draw_frame() {
+void Renderer::draw_frame(float fps, bool show_fps) {
+#ifndef NDEBUG
+	float start_time = glfwGetTime();
+#endif
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glViewport(0, 0, v_width, v_height);
 	glClearColor(0.0f, 0.1f, 0.4f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-	logOpenGLErrors();
 
 	// Draw tilemaps
 
@@ -173,13 +124,14 @@ void Renderer::draw_frame() {
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glEnableVertexAttribArray(0);
 
-	_sort_chunks();
-	auto end = chunk_order.end();
-	for (auto it = chunk_order.begin(); it != end; it++) {
-		auto& chunk = chunks[*it].chunk;
+	u32 chunk_order[CHUNK_MAX];
+	u32 len = _sort_chunks(chunk_order);
+	for (u32 i = 0; i < len; i++) {
+		auto it = chunk_order[i];
+		auto& chunk = chunks[it].chunk;
 		tile_shader.set(tileset_slot, chunk->tileset->bind(0));
 		tile_shader.set(chunk_size_slot, (int) chunk->width);
-		tile_shader.set(offset_slot, chunks[*it].x, chunks[*it].y);
+		tile_shader.set(offset_slot, chunks[it].x, chunks[it].y);
 
 		glBindBuffer(GL_ARRAY_BUFFER, chunk->vbo);
 		glVertexAttribIPointer(1, 1, GL_INT, sizeof(Tile), 0);
@@ -188,11 +140,9 @@ void Renderer::draw_frame() {
 		glVertexAttribIPointer(2, 1, GL_INT, sizeof(Tile), (void*) sizeof(Tile::tile));
 		glEnableVertexAttribArray(2);
 		glVertexAttribDivisor(2, 1);
-		logOpenGLErrors();
 
 		glBindVertexArray(vao);
-		glDrawArraysInstanced(GL_TRIANGLES, 0, 6, chunk->width * chunk->height);
-		logOpenGLErrors();
+		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, chunk->width * chunk->height);
 	}
 
 	// virtual resolution scaling
@@ -204,7 +154,6 @@ void Renderer::draw_frame() {
 	glViewport(0, 0, screen_width, screen_height);
 	glClearColor(0.f, 0.f, 0.f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT);
-	logOpenGLErrors();
 
 	scale_shader.use();
 	scale_shader.set(virtual_screen_slot, framebuffer->bind(0));
@@ -222,13 +171,61 @@ void Renderer::draw_frame() {
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glEnableVertexAttribArray(0);
-	logOpenGLErrors();
 
 	glBindVertexArray(vao);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	logOpenGLErrors();
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+#ifndef NDEBUG
+	float render_time = glfwGetTime() - start_time;
+	if (render_time > 0.016666f)
+	{
+		printf("ALERT: Render took %.2fms this frame\n", render_time * 1000.f);
+	}
+#endif
 
 	glfwSwapBuffers(window);
+}
+
+u32 Renderer::_sort_chunks(u32* buffer) {
+	auto len = chunks.fill_index(buffer, CHUNK_MAX);
+	std::sort(buffer, buffer + len, [&](int left, int right) {
+		auto l = chunks[left].layer;
+		auto r = chunks[right].layer;
+		if (l == r) return left < right; // whee, cheap sort stability!
+		else return l < r;
+	});
+	return len;
+}
+
+ChunkID Renderer::add_chunk(const TileChunk* const chunk, float x, float y, i32 layer) {
+	return chunks.add(ChunkEntry{chunk, x, y, layer});
+}
+
+bool Renderer::remove_chunk(const ChunkID id) {
+	return chunks.remove(id);
+}
+
+
+TileChunk::TileChunk(Texture* const tileset, Tile* const tilemap, u32 width, u32 height):
+	tileset(tileset),
+	tilemap(tilemap),
+	width(width),
+	height(height),
+	vbo(0)
+{
+	glGenBuffers(1, const_cast<GLuint*>(&vbo));
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(tilemap) * width * height, tilemap, GL_DYNAMIC_DRAW);
+}
+
+
+TileChunk::~TileChunk() {
+	glDeleteBuffers(1, &vbo);
+}
+
+void TileChunk::sync() {
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(tilemap) * width * height, tilemap);
 }
 
 u32 rotateCCW(u32 tile) {
@@ -257,9 +254,9 @@ u32 dither(u32 tile, u32 x_mult, u32 y_mult, u32 mod, u32 phase, bool parity) {
 }
 
 u32 filter(u32 cset, float r, float g, float b) {
-	u32 red = (u32) ((1.f - clamp(r)) * 63) << 26;
-	u32 green = (u32) ((1.f - clamp(g)) * 63) << 20;
-	u32 blue = (u32) ((1.f - clamp(b)) * 63) << 14;
+	u32 red = (u32) ((1.f - clamp(r)) * 255) << 24;
+	u32 green = (u32) ((1.f - clamp(g)) * 255) << 16;
+	u32 blue = (u32) ((1.f - clamp(b)) * 255) << 8;
 	return red | green | blue | (cset & 0x00003FFF);
 }
 

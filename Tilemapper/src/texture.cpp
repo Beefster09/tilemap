@@ -61,7 +61,6 @@ Texture::Texture(const char* file) {
 	else {
 		printf("Unable to load texture '%s'\n", file);
 	}
-	logOpenGLErrors();
 }
 
 Texture::Texture(GLuint tex, GLenum type) {
@@ -71,7 +70,6 @@ Texture::Texture(GLuint tex, GLenum type) {
 
 Texture::~Texture() {
 	glDeleteTextures(1, &tex_handle);
-	logOpenGLErrors();
 }
 
 Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int offset_y, int spacing_x, int spacing_y) {
@@ -106,17 +104,14 @@ Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int o
 		GLuint tex_handle;
 		glGenTextures(1, &tex_handle);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tex_handle);
-		logOpenGLErrors();
 
 		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R8UI, tile_size, tile_size, tiles_horiz * tiles_vert, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, tile_data);
-		logOpenGLErrors();
 
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		logOpenGLErrors();
 
 		delete[] tile_data;
 		stbi_image_free(image_data);
@@ -156,13 +151,7 @@ int Texture::bind(int slot) {
 	bound_slot = slot;
 	boundTextures[slot] = {this, bindingNumber++, 1};
 	glActiveTexture(GL_TEXTURE0 + slot);
-	logOpenGLErrors();
 	glBindTexture(type, tex_handle);
-	if (logOpenGLErrors()) {
-		printf("Texture Handle: %d\n", tex_handle);
-		printf("Texture Slot: %d\n", slot);
-		printf("Texture type: %s\n", glEnumName(type));
-	};
 	return slot;
 }
 
@@ -175,7 +164,7 @@ void Texture::evict() {
 //	GLuint tex_handle;
 //	glGenTextures(1, &tex_handle);
 //	glBindTexture(GL_TEXTURE_2D, tex_handle);
-//	logOpenGLErrors();
+//
 //
 //
 //}
@@ -196,10 +185,8 @@ Palette::Palette(std::initializer_list<std::initializer_list<Color>> color_data)
 	GLuint tex_handle;
 	glGenTextures(1, &tex_handle);
 	glBindTexture(GL_TEXTURE_RECTANGLE, tex_handle);
-	logOpenGLErrors();
 
 	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB, cset_size, csets, 0, GL_RGB, GL_UNSIGNED_BYTE, colors.data());
-	logOpenGLErrors();
 
 	new(&tex) Texture(tex_handle, GL_TEXTURE_RECTANGLE);
 }

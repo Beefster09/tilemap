@@ -70,21 +70,19 @@ private:
 
 	Texture* framebuffer;
 
-	//std::vector<ChunkEntry> chunks;
 	Table<ChunkEntry> chunks;
-	std::vector<int> chunk_order;
-
 	Table<Sprite> sprites;
-	std::vector<int> sprite_order;
 
 	glm::mat4 camera;
 	float scaling_sharpness = 2.f;
+	float last_frame_time = 1.f;
 
-	void _sort_chunks();
+	u32 _sort_chunks(u32 * buffer);
 
 public:
 	Renderer(GLFWwindow* window, int width, int height);
-	void draw_frame();
+	void draw_frame(float fps, bool show_fps);
+
 
 	inline void set_sharpness(float sharpness) {
 		scaling_sharpness = max(sharpness, 0.f);

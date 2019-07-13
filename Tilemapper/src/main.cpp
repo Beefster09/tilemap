@@ -23,6 +23,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	screen_height = height;
 	glViewport(0, 0, width, height);
 }
+constexpr float FPS_SMOOTHING = 0.9f;
 
 int main(int argc, char* argv[]) {
 	glfwInit();
@@ -63,14 +64,29 @@ int main(int argc, char* argv[]) {
 		renderer.add_chunk(&test_chunk, 60, 20, -2);
 		renderer.add_chunk(&test_chunk, 96, 16, -3);
 		renderer.add_chunk(&test_chunk, 125, 35, 2);
-		renderer.add_chunk(&test_chunk, 24, 48, 2);
+		auto blah = renderer.add_chunk(&test_chunk, 150, 80, 2);
+		auto blah_base_x = blah->x;
+		auto blah_base_y = blah->y;
+
+		logOpenGLErrors();
 
 		float base_sharp = renderer.get_sharpness();
 		bool pressed = false;
+		float last_frame_time = glfwGetTime();
+		float frame_period = 0.f;
 
 		while(!glfwWindowShouldClose(window))
 		{
 			glfwPollEvents();
+
+			float time = glfwGetTime();
+			float diff = time - last_frame_time;
+			last_frame_time = time;
+			frame_period = (frame_period * FPS_SMOOTHING) + (diff * (1.f - FPS_SMOOTHING));
+			float fps = 1.f / frame_period;
+
+			blah->x = 96 * sinf(time * TAU * 0.5) + blah_base_x;
+			blah->y = 52 * cosf(time * TAU * 1.2) + blah_base_y;
 
 			if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
 				double mouse_x, mouse_y;
@@ -86,9 +102,17 @@ int main(int argc, char* argv[]) {
 			}
 			else {
 				pressed = false;
+				for (int key = GLFW_KEY_0; key <= GLFW_KEY_9; key++) {
+					if(glfwGetKey(window, key)) {
+						renderer.set_sharpness((float) (key - GLFW_KEY_0) * 0.25);
+						printf("Scaling sharpness: %.3f\n", renderer.get_sharpness());
+					}
+				}
 			}
 
-			renderer.draw_frame();
+			renderer.draw_frame(fps, true);
+
+			logOpenGLErrors();
 
 			if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
 				glfwSetWindowShouldClose(window, true);

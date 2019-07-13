@@ -10,11 +10,6 @@
 
 constexpr int INFO_LOG_SIZE = 4096;
 
-//static const char* COMMON =
-//R"==(#version 330 core
-//#line 0
-//)==";
-
 GLuint compileShader(const char* vertexShaderSource, const char* fragmentShaderSource) {
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
@@ -64,8 +59,6 @@ GLuint compileShader(const char* vertexShaderSource, const char* fragmentShaderS
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
 
-	logOpenGLErrors();
-
 	return shaderProgram;
 }
 
@@ -85,8 +78,6 @@ GLuint compileShaderFromFiles(const char* vertexShaderFile, const char* fragment
 
 	GLuint shaderProgram = compileShader(vShader, fShader);
 
-	assert(shaderProgram != -1);
-
 	delete[] vShader, fShader;
 
 	return shaderProgram;
@@ -95,6 +86,7 @@ GLuint compileShaderFromFiles(const char* vertexShaderFile, const char* fragment
 GLuint Shader::activeProgram = -1;
 
 Shader::Shader(GLuint shaderID, const char* vert_src, const char* frag_src) {
+	assert(shaderID != -1);
 	shaderProgram = shaderID; //compileShaderFromFiles(vert, frag);
 	transformSlot = getSlot("transform");
 	cameraSlot = getSlot("camera");
@@ -126,13 +118,11 @@ void Shader::use() const {
 	if (activeProgram != shaderProgram) {
 		activeProgram = shaderProgram;
 		glUseProgram(shaderProgram);
-		logOpenGLErrors();
 	}
 }
 
 int Shader::getSlot(const char* name) const {
 	int slot = glGetUniformLocation(shaderProgram, name);
-	logOpenGLErrors();
 	return slot;
 }
 
@@ -140,77 +130,66 @@ void Shader::set(int slot, int i) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform1i(slot, i);
-	logOpenGLErrors();
 }
 
 void Shader::setUint(int slot, unsigned int u) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform1ui(slot, u);
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, float f) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform1f(slot, f);
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, float x, float y) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform2f(slot, x, y);
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, glm::vec2 vec) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform2f(slot, XY(vec));
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, glm::vec3 vec) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform3f(slot, XYZ(vec));
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, glm::vec4 vec) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform4f(slot, XYZ(vec), vec.w);
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, const glm::mat4& mat) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniformMatrix4fv(slot, 1, GL_FALSE, &mat[0][0]);
-	logOpenGLErrors();
 }
 
 void Shader::set(int slot, Texture* tex) const {
 	if (slot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniform1i(slot, tex->bind());
-	logOpenGLErrors();
 }
 
 void Shader::setCamera(const glm::mat4& camera) const {
 	if (cameraSlot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniformMatrix4fv(cameraSlot, 1, GL_FALSE, glm::value_ptr(camera));
-	logOpenGLErrors();
 }
 
 void Shader::setTransform(const glm::mat4& transform) const {
 	if (transformSlot < 0) return;
 	assert(activeProgram == shaderProgram);
 	glUniformMatrix4fv(transformSlot, 1, GL_FALSE, glm::value_ptr(transform));
-	logOpenGLErrors();
 }
 
 void Shader::setTransform(glm::vec2 position, glm::vec2 scale, float yawRot) const {

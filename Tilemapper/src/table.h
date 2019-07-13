@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <assert.h>
 
 #include "common.h"
@@ -9,9 +8,9 @@
 template <typename T>
 class Table {
 	struct Entry {
-		T item;
 		u32 generation = 0;
 		bool occupied = false;
+		T item;
 
 		Entry(const T& item, u32 generation, bool occupied): item(item), generation(generation), occupied(occupied) {}
 		Entry(T&& item, u32 generation, bool occupied): item(item), generation(generation), occupied(occupied) {}
@@ -19,7 +18,8 @@ class Table {
 		friend struct Handle;
 	};
 
-	std::vector<Entry> data;
+	Entry* data;  // Yes, std::vector *really is* that slow, especially the MSVC implementation.
+	size_t capacity;
 
 public:
 	struct Handle {
@@ -27,25 +27,31 @@ public:
 		u32 index;
 		u32 generation;
 
-		bool is_valid() {
-			return table != nullptr && index < table->data.size() && generation == table->data[index].generation;
+		bool is_valid() const {
+			return table != nullptr && index < table->capacity && generation == table->data[index].generation;
+		}
+		operator bool() const {
+			return is_valid();
 		}
 
-		T& operator * () {
+		T& operator * () const {
 			assert(is_valid());
-			return data[index].item;
+			return table->data[index].item;
 		}
 
-		T* operator -> () {
-			if(is_valid()) return &data[index].item;
-			else return nullptr;
+		T* operator -> () const {
+			assert(is_valid());
+			return &table->data[index].item;
 		}
 	};
 
-	Table(size_t initial_capacity=64) { data.reserve(initial_capacity); }
+	Table(size_t initial_capacity = 64) {
+		data = (Entry*) calloc(initial_capacity, sizeof(Entry));
+		capacity = initial_capacity;
+	}
 
 	Handle add(T&& item) {
-		for (u32 i = 0; i < data.size(); i++) {
+		for (u32 i = 0; i < capacity; i++) {
 			if (!data[i].occupied) {
 				data[i].item = item;
 				data[i].generation++;
@@ -53,9 +59,11 @@ public:
 				return {this, i, data[i].generation};
 			}
 		}
+		// No more room.
+		return { nullptr, 0, 0 };
 		// Table is full. Add an entry.
-		data.emplace_back(item, 1, true);
-		return {this, (u32) data.size() - 1, 1};
+		//data.emplace_back(item, 1, true);
+		//return {this, (u32) data.size() - 1, 1};
 	}
 
 	Handle add(const T& item) {
@@ -74,27 +82,14 @@ public:
 		return data[index].item;
 	}
 
-	template <typename S=size_t>
-	std::vector<S>&& create_index() {
-		std::vector<S> items;
-		items.reserve(data.size());
-		for (int i = 0; i < data.size(); i++) {
+	u32 fill_index(u32* const items, const u32 buf_size) {
+		u32 cur = 0;
+		for (u32 i = 0; i < capacity; i++) {
 			if (data[i].occupied) {
-				items.push_back(i);
+				items[cur++] = i;
 			}
 		}
-		items.shrink_to_fit();
-		return std::move(items);
-	}
-
-	template <typename S>
-	S fill_index(std::vector<S>& items) {
-		for (int i = 0; i < data.size(); i++) {
-			if (data[i].occupied) {
-				items.push_back(i);
-			}
-		}
-		return static_cast<S>(items.size());
+		return cur;
 	}
 
 	size_t count() {
