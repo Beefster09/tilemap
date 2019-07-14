@@ -68,6 +68,9 @@ int main(int argc, char* argv[]) {
 		auto blah_base_x = blah->x;
 		auto blah_base_y = blah->y;
 
+		Texture spritesheet("assets/tileset24bit.png");
+		//renderer.add_sprite();
+
 		logOpenGLErrors();
 
 		float base_sharp = renderer.get_sharpness();
@@ -85,7 +88,7 @@ int main(int argc, char* argv[]) {
 			frame_period = (frame_period * FPS_SMOOTHING) + (diff * (1.f - FPS_SMOOTHING));
 			float fps = 1.f / frame_period;
 
-			blah->x = 96 * sinf(time * TAU * 0.5) + blah_base_x;
+			blah->x = 96 * sinf(time * TAU * 0.8) + blah_base_x;
 			blah->y = 52 * cosf(time * TAU * 1.2) + blah_base_y;
 
 			if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {

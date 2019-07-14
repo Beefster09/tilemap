@@ -19,10 +19,6 @@ void main() {
         sharpen(frag_uv.x * vres.x) / vres.x,
         sharpen(frag_uv.y * vres.y) / vres.y
     ));
-    // To visualize how this makes the grid:
-    // frag_color = vec4(
-    //     fract(sharpen(frag_uv.x * vres.x)),
-    //     fract(sharpen(frag_uv.y * vres.y)),
-    //     0.5, 1.0
-    // );
+
+    // adsfasdf
 }

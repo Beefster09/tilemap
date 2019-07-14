@@ -1,6 +1,8 @@
 #version 330 core
 
 layout (location = 0) in vec2 vert_pos;
+
+// Instanced data
 layout (location = 1) in uint vert_tile;
 layout (location = 2) in uint vert_cset;
 

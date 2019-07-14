@@ -9,7 +9,7 @@ def make_id(filename, prefix, suffix):
     return prefix + os.path.basename(infile).upper().replace('.', '_') + suffix
 
 def output_c_const(infile, var, file=sys.stdout):
-    print("const char*", var, '= (', file=file)
+    print("const char*", var, '= ( ""', file=file)
     with open(infile) as f:
         for line in f:
             print('"', str(line.encode('unicode-escape'), 'utf-8').replace('"', '\"'), '"', sep='', file=file)
@@ -30,6 +30,8 @@ if __name__ == '__main__':
         args.files = [*itertools.chain.from_iterable(
             glob.iglob(pattern) for pattern in args.files
         )]
+
+    print("Embedding", '; '.join(args.files), 'into', args.outfile)
 
     if args.outfile:
         if args.lazy and os.path.isfile(args.outfile):

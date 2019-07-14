@@ -12,3 +12,4 @@ x64/**
 *.pdb
 *.obj.enc
 *__generated*
+**/generated/*

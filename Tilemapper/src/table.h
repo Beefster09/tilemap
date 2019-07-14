@@ -1,34 +1,37 @@
 #pragma once
 
-#include <assert.h>
+#include <cassert>
 
 #include "common.h"
 // Implements a basic generational index table
 
+int findZeroBit(const u64 section);
+
+constexpr u64 CAP_ROUND = ~0x3F;
+
 template <typename T>
 class Table {
-	struct Entry {
-		u32 generation = 0;
-		bool occupied = false;
-		T item;
-
-		Entry(const T& item, u32 generation, bool occupied): item(item), generation(generation), occupied(occupied) {}
-		Entry(T&& item, u32 generation, bool occupied): item(item), generation(generation), occupied(occupied) {}
-
-		friend struct Handle;
-	};
-
-	Entry* data;  // Yes, std::vector *really is* that slow, especially the MSVC implementation.
+	T* data;  // Yes, std::vector *really is* that slow, especially the MSVC implementation.
 	size_t capacity;
+	u64* occupied;
+	u32* generation;
 
 public:
+	Table(size_t capacity = 64) {
+		capacity = (capacity + 63) & CAP_ROUND; // round capacity up to nearest 64;
+		this->capacity = capacity;
+		data = (T*) malloc(capacity * sizeof(T));
+		generation = (u32*) calloc(capacity, sizeof(u32));
+		occupied = (u64*) calloc(capacity / 64, sizeof(u64));
+	}
+
 	struct Handle {
 		Table* table;
 		u32 index;
 		u32 generation;
 
 		bool is_valid() const {
-			return table != nullptr && index < table->capacity && generation == table->data[index].generation;
+			return table != nullptr && index < table->capacity && generation == table->generation[index];
 		}
 		operator bool() const {
 			return is_valid();
@@ -36,27 +39,25 @@ public:
 
 		T& operator * () const {
 			assert(is_valid());
-			return table->data[index].item;
+			return table->data[index];
 		}
 
 		T* operator -> () const {
 			assert(is_valid());
-			return &table->data[index].item;
+			return &table->data[index];
 		}
 	};
 
-	Table(size_t initial_capacity = 64) {
-		data = (Entry*) calloc(initial_capacity, sizeof(Entry));
-		capacity = initial_capacity;
-	}
-
 	Handle add(T&& item) {
-		for (u32 i = 0; i < capacity; i++) {
-			if (!data[i].occupied) {
-				data[i].item = item;
-				data[i].generation++;
-				data[i].occupied = true;
-				return {this, i, data[i].generation};
+		auto occ_len = capacity >> 6;
+		for (u32 i = 0; i < occ_len; i++) {
+			int bit = findZeroBit(occupied[i]);
+			if (bit >= 0) {
+				int index = (i << 6) + bit;
+				data[index] = item;
+				generation[index]++;
+				BITSET(occupied[i], bit);
+				return {this, (u32) index, generation[index]};
 			}
 		}
 		// No more room.
@@ -73,20 +74,21 @@ public:
 	bool remove(const Handle id) {
 		if (id.table != this) return false;
 		auto candidate = data[id.index];
-		if (candidate.generation != id.generation) return false;
-		candidate.occupied = false;
+		if (generation[id.index] != id.generation) return false;
+		BITCLEAR(occupied[id.index >> 6], id.index & 0x3F);
 		return true;
 	}
 
 	T& operator [] (const size_t index) {
-		return data[index].item;
+		return data[index];
 	}
 
 	u32 fill_index(u32* const items, const u32 buf_size) {
-		u32 cur = 0;
-		for (u32 i = 0; i < capacity; i++) {
-			if (data[i].occupied) {
+		u64 cur = 0;
+		for (u64 i = 0; i < capacity; i++) {
+			if (BITOF(occupied[i >> 6], i & 0x3F) != 0l) {
 				items[cur++] = i;
+				if (cur >= buf_size) return cur;
 			}
 		}
 		return cur;
@@ -94,8 +96,10 @@ public:
 
 	size_t count() {
 		size_t c = 0;
-		for (int i = 0; i < data.size(); i++) {
-			c += data[i].occupied? 1 : 0;
+		auto occ_len = capacity >> 6;
+		for (int i = 0; i < occ_len; i++) {
+			// TODO: __popcnt64 is an intrinsic, so it needs to be compiler-switched for architectures that don't support it.
+			c += __popcnt64(occupied[i]);
 		}
 		return c;
 	}

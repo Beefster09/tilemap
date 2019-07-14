@@ -25,6 +25,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    print("Extracting uniforms from", '; '.join(args.files), 'into', args.outfile)
+
     if args.outfile:
         if args.lazy and os.path.isfile(args.outfile):
             outstat = os.stat(args.outfile)

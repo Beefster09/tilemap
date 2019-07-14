@@ -8,7 +8,7 @@
 #include "renderer.h"
 
 constexpr int CHUNK_MAX = 64;
-constexpr int SANE_SPRITE_MAX = 512;
+constexpr int SPRITE_MAX = 512;
 
 const float tile_vertices[] = {
 	0.f, 0.f,
@@ -24,39 +24,51 @@ extern int screen_width, screen_height;
 #define COMPILE_SHADER(V, F) compileShaderFromFiles((V), (F))
 #define TILECHUNK_VERT_SHADER = "shaders/tilechunk.vert"
 #define TILECHUNK_VERT_SHADER = "shaders/tilechunk.frag"
+#define SPRITE_VERT_SHADER = "shaders/sprite.vert"
+#define SPRITE_VERT_SHADER = "shaders/sprite.frag"
 #define SCALE_VERT_SHADER = "shaders/scale.vert"
 #define SCALE_VERT_SHADER = "shaders/scale.frag"
 
 #define TILECHUNK_VERT_SHADER__SRC = "tilechunk.vert"
 #define TILECHUNK_VERT_SHADER__SRC = "tilechunk.frag"
+#define SPRITE_VERT_SHADER__SRC = "sprite.vert"
+#define SPRITE_VERT_SHADER__SRC = "spirte.frag"
 #define SCALE_VERT_SHADER__SRC = "scale.vert"
 #define SCALE_VERT_SHADER__SRC = "scale.frag"
 
 #else
 
 #define COMPILE_SHADER(V, F) compileShader((V), (F))
-#include "shaders__generated.h"
+#include "generated/shaders.h"
 
 #endif
 
 #define __SHADER(S) COMPILE_SHADER(S ## _VERT_SHADER, S ## _FRAG_SHADER), S ## _VERT_SHADER__SRC, S ## _FRAG_SHADER__SRC
 #define __SHADER2(V, F) COMPILE_SHADER(V ## _VERT_SHADER, F ## _FRAG_SHADER), V ## _VERT_SHADER__SRC, F ## _FRAG_SHADER__SRC
 
-
-#define __SLOT(VAR) (VAR ## _slot) = __S.getSlot(#VAR)
+#define EXPAND(V) V
+#define __S_SL EXPAND(__S) ## _slots
+#define __S_SH EXPAND(__S) ## _shader
+#define __SLOT(VAR) (__S_SL.VAR) = (__S_SH).getSlot(#VAR)
 Renderer::Renderer(GLFWwindow* window, int width, int height):
 	window(window),
 	tile_shader(__SHADER(TILECHUNK)),
+	sprite_shader(__SHADER(SPRITE)),
 	scale_shader(__SHADER(SCALE)),
 	chunks(CHUNK_MAX),
 	sprites(SANE_SPRITE_MAX)
 {
-#define __S tile_shader
-#include "tilechunk_uniforms__generated.h"
+#define __S tile
+#include "generated/tilechunk_uniforms.h"
 #undef __S
 
-#define __S scale_shader
-#include "scale_uniforms__generated.h"
+#define __S scale
+#include "generated/scale_uniforms.h"
+#undef __S
+
+#define __S sprite
+#include "generated/sprite_uniforms.h"
+#undef __S
 
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
@@ -94,6 +106,11 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
 	framebuffer = new Texture(framebuf);
 
+	sprite_attrs = (SpriteAttributes*) calloc(SPRITE_MAX, sizeof(SpriteAttributes));
+	glGenBuffers(1, &sprite_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * width * height, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
+
 	camera = glm::ortho(0.f, (float) width, 0.f, (float) height);
 
 	glEnable(GL_BLEND);
@@ -107,6 +124,21 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 	float start_time = glfwGetTime();
 #endif
 
+	u32 chunk_order[CHUNK_MAX];
+	u32 len = _sort_chunks(chunk_order);
+
+	u32 sprite_order[SPRITE_MAX];
+	u32 slen = _sort_sprites(sprite_order);
+	// prepare all the sprite attributes for sending to the GPU
+	for (u32 i = 0; i < slen; i++) {
+		auto it = sprite_order[i];
+		sprite_attrs[i] = sprites[it].attrs;
+	}
+	if (slen) {
+		glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(SpriteAttributes) * slen, sprite_attrs);
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glViewport(0, 0, v_width, v_height);
 	glClearColor(0.0f, 0.1f, 0.4f, 1.0f);
@@ -115,8 +147,7 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 	// Draw tilemaps
 
 	tile_shader.use();
-	tile_shader.set(palette_slot, palette->bind(1));
-	tile_shader.setUint(flags_slot, 1);
+	tile_shader.set(tile_slots.palette, palette->bind(1));
 	tile_shader.setTransform(glm::mat4(1.f));
 	tile_shader.setCamera(camera);
 
@@ -124,26 +155,32 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glEnableVertexAttribArray(0);
 
-	u32 chunk_order[CHUNK_MAX];
-	u32 len = _sort_chunks(chunk_order);
+	// TODO: sprites
 	for (u32 i = 0; i < len; i++) {
 		auto it = chunk_order[i];
 		auto& chunk = chunks[it].chunk;
-		tile_shader.set(tileset_slot, chunk->tileset->bind(0));
-		tile_shader.set(chunk_size_slot, (int) chunk->width);
-		tile_shader.set(offset_slot, chunks[it].x, chunks[it].y);
+		tile_shader.set(tile_slots.tileset, chunk->tileset->bind(0));
+		tile_shader.set(tile_slots.chunk_size, (int) chunk->width);
+		tile_shader.set(tile_slots.offset, chunks[it].x, chunks[it].y);
+		// Convention: Display Color 0 on layers 0 and below.
+		tile_shader.setUint(tile_slots.flags, chunks[it].layer > 0 ? 0 : CHUNK_FLAG_SHOW_COLOR0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, chunk->vbo);
-		glVertexAttribIPointer(1, 1, GL_INT, sizeof(Tile), 0);
+		glVertexAttribIPointer(1, 1, GL_INT, sizeof(Tile), (void*) offsetof(Tile, tile));
 		glEnableVertexAttribArray(1);
 		glVertexAttribDivisor(1, 1);
-		glVertexAttribIPointer(2, 1, GL_INT, sizeof(Tile), (void*) sizeof(Tile::tile));
+		glVertexAttribIPointer(2, 1, GL_INT, sizeof(Tile), (void*) offsetof(Tile, cset));
 		glEnableVertexAttribArray(2);
 		glVertexAttribDivisor(2, 1);
 
 		glBindVertexArray(vao);
 		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, chunk->width * chunk->height);
+
+		// TODO: Interleave Sprites
 	}
+
+	// TODO: UI
+	// TODO: Print FPS
 
 	// virtual resolution scaling
 
@@ -156,17 +193,17 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	scale_shader.use();
-	scale_shader.set(virtual_screen_slot, framebuffer->bind(0));
+	scale_shader.set(scale_slots.virtual_screen, framebuffer->bind(0));
 
 	// Determine the letterboxing ratio
 	float scale_x = (float) screen_width / (float) v_width;
 	float scale_y = (float) screen_height / (float) v_height;
 	float max_scale = max(scale_x, scale_y);
 
-	scale_shader.set(letterbox_slot, glm::vec2(
+	scale_shader.set(scale_slots.letterbox, glm::vec2(
 		scale_y / max_scale, scale_x / max_scale
 	));
-	scale_shader.set(sharpness_slot, max(scaling_sharpness, 0.f) * max_scale / 5.f);
+	scale_shader.set(scale_slots.sharpness, max(scaling_sharpness, 0.f) * max_scale / 5.f);
 
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
@@ -192,6 +229,22 @@ u32 Renderer::_sort_chunks(u32* buffer) {
 		auto l = chunks[left].layer;
 		auto r = chunks[right].layer;
 		if (l == r) return left < right; // whee, cheap sort stability!
+		else return l < r;
+	});
+	return len;
+}
+
+u32 Renderer::_sort_sprites(u32* buffer) {
+	auto len = chunks.fill_index(buffer, SPRITE_MAX);
+	std::sort(buffer, buffer + len, [&](int left, int right) {
+		auto l = sprites[left].attrs.layer;
+		auto r = sprites[right].attrs.layer;
+		if (l == r) {
+			auto lt = (intptr_t) sprites[left].spritesheet;
+			auto rt = (intptr_t) sprites[right].spritesheet;
+			if (lt == rt) return left < right; // whee, cheap sort stability!
+			else return lt < rt;
+		}
 		else return l < r;
 	});
 	return len;

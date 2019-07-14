@@ -19,6 +19,11 @@ int _logOpenGLErrors(const char* caller, const char* file, int lineNo);
 #define XZ(VEC) VEC.x, VEC.z
 #define XYZ(VEC) VEC.x, VEC.y, VEC.z
 
+#define BIT(B) (1ULL << (B))
+#define BITOF(X, B) ((X) & BIT(B))
+#define BITSET(X, B) ((X) |= BIT(B))
+#define BITCLEAR(X, B) ((X) &= ~BIT(B))
+
 template<typename T>
 inline T max(T a, T b) {
 	return a > b? a : b;
