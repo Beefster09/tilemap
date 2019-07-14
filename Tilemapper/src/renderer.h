@@ -39,11 +39,10 @@ struct ChunkEntry {
 };
 
 struct SpriteAttributes {
-	u32 src_x, src_y, src_w, src_h;
-	float x, y, px, py;
+	i32 src_x, src_y, src_w, src_h;
+	float x, y;
 	i32 layer;
-	float rotation;
-	u32 cset;
+	u32 flags;
 };
 
 struct Sprite {
@@ -104,14 +103,24 @@ public:
 	ChunkID add_chunk(const TileChunk* const chunk, float x, float y, i32 layer);
 	bool remove_chunk(const ChunkID id);
 
-	ChunkID add_chunk(const TileChunk* const chunk, float x, float y, i32 layer);
+	SpriteID add_sprite(
+		Texture* const spritesheet,
+		float x, float y,
+		i32 layer,
+		i32 src_x, i32 src_y, i32 src_w, i32 src_h,
+		u8 cset,
+		u32 flip = 0,
+		float r = 1.f, float g = 1.f, float b = 1.f, float a = 1.f,
+		bool show_color0 = false
+	);
+	bool remove_sprite(const SpriteID id);
 };
 
 // tile modifiers
 
-constexpr u32 HFLIP = 0x00080000;
-constexpr u32 VFLIP = 0x00040000;
-constexpr u32 DFLIP = 0x00020000;
+constexpr u32 HFLIP = 0x80000000;
+constexpr u32 VFLIP = 0x40000000;
+constexpr u32 DFLIP = 0x20000000;
 
 u32 rotateCW(u32 tile = 0);
 u32 rotateCCW(u32 tile = 0);
@@ -119,10 +128,10 @@ u32 hflip(u32 tile = 0);
 u32 vflip(u32 tile = 0);
 u32 transpose(u32 tile = 0);
 
-u32 dither(u32 tile, u32 x_mult, u32 y_mult, u32 mod = 2, u32 phase = 0, bool parity = false);
-
 // tile render modifiers
 
-u32 filter(u32 cset, float r, float g, float b);
+u32 filter_tile(u32 cset, float r, float g, float b);
 
-constexpr u32 CHUNK_FLAG_SHOW_COLOR0 = 0x1;
+constexpr u32 SHOW_COLOR0 = 0x100;
+
+u32 filter_sprite(u8 cset, float r, float g, float b);

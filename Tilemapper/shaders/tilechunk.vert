@@ -18,9 +18,9 @@ flat out uint frag_tile;
 flat out uint frag_cset;
 flat out vec4 color_filter;
 
-const uint HFLIP = 0x00080000u;
-const uint VFLIP = 0x00040000u;
-const uint DFLIP = 0x00020000u;
+const uint HFLIP = 0x80000000u;
+const uint VFLIP = 0x40000000u;
+const uint DFLIP = 0x20000000u;
 const uint TILE_MASK = 0x0001FFFFu;
 
 /*
@@ -34,7 +34,7 @@ C: colorset index (0-255)
 
 /*
 tile packing:
-???? ???? - ???? HVDT - TTTT TTTT - TTTT TTTT
+HVD? ???? - ???? ???T - TTTT TTTT - TTTT TTTT
 H: Horizontal flip
 V: Vertical flip
 D: Diagonal flip (transposes x and y)

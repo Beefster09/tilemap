@@ -62,9 +62,6 @@ public:
 		}
 		// No more room.
 		return { nullptr, 0, 0 };
-		// Table is full. Add an entry.
-		//data.emplace_back(item, 1, true);
-		//return {this, (u32) data.size() - 1, 1};
 	}
 
 	Handle add(const T& item) {

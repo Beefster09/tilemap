@@ -36,7 +36,7 @@ static TextureBindingEntry boundTextures[16] = {
 	{nullptr, 0, 0},
 };
 
-Texture::Texture(const char* file) {
+/*Texture::Texture(const char* file) {
 	stbi_set_flip_vertically_on_load(true);
 	int width, height, nrChannels;
 	unsigned char *data = stbi_load(file, &width, &height, &nrChannels, 0);
@@ -61,7 +61,7 @@ Texture::Texture(const char* file) {
 	else {
 		printf("Unable to load texture '%s'\n", file);
 	}
-}
+}*/
 
 Texture::Texture(GLuint tex, GLenum type) {
 	tex_handle = tex;
@@ -116,6 +116,37 @@ Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int o
 		delete[] tile_data;
 		stbi_image_free(image_data);
 		return new Texture(tex_handle, GL_TEXTURE_2D_ARRAY); // TODO? use an allocator and placement new?
+	}
+	else {
+		printf("Unable to load texture '%s'\n", image_file);
+		return nullptr;
+	}
+}
+
+Texture* load_spritesheet(const char* image_file) {
+	stbi_set_flip_vertically_on_load(true);
+	int width, height, n_channels;
+	unsigned char *image_data = stbi_load(image_file, &width, &height, &n_channels, 0);
+
+	if (image_data) {
+		unsigned char* spritesheet_data = new unsigned char[width * height];
+		for (int i = 0; i < width * height; i++) {
+			spritesheet_data[i] = image_data[i * n_channels];
+		}
+		GLuint tex_handle;
+		glGenTextures(1, &tex_handle);
+		glBindTexture(GL_TEXTURE_RECTANGLE, tex_handle);
+
+		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8UI, width, height, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, spritesheet_data);
+
+		glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		delete[] spritesheet_data;
+		stbi_image_free(image_data);
+		return new Texture(tex_handle, GL_TEXTURE_RECTANGLE);
 	}
 	else {
 		printf("Unable to load texture '%s'\n", image_file);

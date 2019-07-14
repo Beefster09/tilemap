@@ -1,5 +1,5 @@
 
-#include <glad/glad.h> 
+#include <glad/glad.h>
 #include <glfw3.h>
 
 #include <cstdio>
@@ -7,14 +7,14 @@
 #include "renderer.h"
 
 //int screen_width = 1280;
-int screen_width = 512 * 2;
+int screen_width = 512 * 3;
 //int screen_height = 720;
-int screen_height = 288 * 2;
+int screen_height = 288 * 3;
 
 Tile simple_tilemap[] = {
 	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
 	2|VFLIP, 0, 2|HFLIP|VFLIP, 0, 2|DFLIP|VFLIP, 0, 2|HFLIP|DFLIP|VFLIP, 0,
-	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
+	2, 0, rotateCW(2), 0, rotateCW(rotateCW(2)), filter_tile(0, 1.f, 0.5f, 0.f), rotateCCW(2), 0,
 	2|VFLIP, 0, rotateCW(2|VFLIP), 0, rotateCW(rotateCW(2|VFLIP)), 0, rotateCCW(2|VFLIP), 0,
 };
 
@@ -63,13 +63,17 @@ int main(int argc, char* argv[]) {
 		renderer.add_chunk(&test_chunk, 64, 24, -2);
 		renderer.add_chunk(&test_chunk, 60, 20, -2);
 		renderer.add_chunk(&test_chunk, 96, 16, -3);
-		renderer.add_chunk(&test_chunk, 125, 35, 2);
+		renderer.add_chunk(&test_chunk, 125, 35, 0);
 		auto blah = renderer.add_chunk(&test_chunk, 150, 80, 2);
 		auto blah_base_x = blah->x;
 		auto blah_base_y = blah->y;
 
-		Texture spritesheet("assets/tileset24bit.png");
-		//renderer.add_sprite();
+		auto spritesheet = load_spritesheet("assets/tileset24bit.png");
+		renderer.add_sprite(spritesheet, 120.f, 74.f, 1, 34, 62, 18, 12, 0);
+		renderer.add_sprite(spritesheet, 10.f, 11.f, 0, 17, 2, 8, 8, 0);
+		auto meh = renderer.add_sprite(spritesheet, 127.f, 90.f, 2, 47, 93, 15, 21, 0);
+		auto meh_base_x = meh->attrs.x;
+		auto meh_base_y = meh->attrs.y;
 
 		logOpenGLErrors();
 
@@ -90,6 +94,9 @@ int main(int argc, char* argv[]) {
 
 			blah->x = 96 * sinf(time * TAU * 0.8) + blah_base_x;
 			blah->y = 52 * cosf(time * TAU * 1.2) + blah_base_y;
+
+			meh->attrs.x = 120 * sinf(time * TAU * 0.3) + meh_base_x;
+			meh->attrs.y = 12 * cosf(time * TAU * 0.5) + meh_base_y;
 
 			if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
 				double mouse_x, mouse_y;

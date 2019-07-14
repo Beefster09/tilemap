@@ -56,7 +56,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	sprite_shader(__SHADER(SPRITE)),
 	scale_shader(__SHADER(SCALE)),
 	chunks(CHUNK_MAX),
-	sprites(SANE_SPRITE_MAX)
+	sprites(SPRITE_MAX)
 {
 #define __S tile
 #include "generated/tilechunk_uniforms.h"
@@ -109,9 +109,9 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	sprite_attrs = (SpriteAttributes*) calloc(SPRITE_MAX, sizeof(SpriteAttributes));
 	glGenBuffers(1, &sprite_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * width * height, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
+	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * SPRITE_MAX, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
 
-	camera = glm::ortho(0.f, (float) width, 0.f, (float) height);
+	camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 100.f, -100.f);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -125,7 +125,7 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 #endif
 
 	u32 chunk_order[CHUNK_MAX];
-	u32 len = _sort_chunks(chunk_order);
+	u32 clen = _sort_chunks(chunk_order);
 
 	u32 sprite_order[SPRITE_MAX];
 	u32 slen = _sort_sprites(sprite_order);
@@ -134,47 +134,100 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 		auto it = sprite_order[i];
 		sprite_attrs[i] = sprites[it].attrs;
 	}
-	if (slen) {
-		glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(SpriteAttributes) * slen, sprite_attrs);
-	}
 
+	// Prepare for drawing
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glViewport(0, 0, v_width, v_height);
 	glClearColor(0.0f, 0.1f, 0.4f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	// Draw tilemaps
+	// Draw tilemaps and sprites
 
-	tile_shader.use();
-	tile_shader.set(tile_slots.palette, palette->bind(1));
-	tile_shader.setTransform(glm::mat4(1.f));
-	tile_shader.setCamera(camera);
+	enum { NONE = 0, TILECHUNK, SPRITE } current_shader = NONE;
+	u32 ci = 0, si = 0;
 
-	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
-	glEnableVertexAttribArray(0);
+	while (ci < clen || si < slen) {
+		if (si >= slen // no more sprites to draw
+			|| ci < clen && chunks[chunk_order[ci]].layer <= sprite_attrs[si].layer) { // or this chunk is on the same layer or below as the next sprite
+			if (current_shader != TILECHUNK) {
+				tile_shader.use();
+				tile_shader.set(tile_slots.palette, palette->bind(1));
+				tile_shader.setCamera(camera);
 
-	// TODO: sprites
-	for (u32 i = 0; i < len; i++) {
-		auto it = chunk_order[i];
-		auto& chunk = chunks[it].chunk;
-		tile_shader.set(tile_slots.tileset, chunk->tileset->bind(0));
-		tile_shader.set(tile_slots.chunk_size, (int) chunk->width);
-		tile_shader.set(tile_slots.offset, chunks[it].x, chunks[it].y);
-		// Convention: Display Color 0 on layers 0 and below.
-		tile_shader.setUint(tile_slots.flags, chunks[it].layer > 0 ? 0 : CHUNK_FLAG_SHOW_COLOR0);
+				glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+				glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+				glEnableVertexAttribArray(0);
+				glDisableVertexAttribArray(3);
+				glDisableVertexAttribArray(4);
 
-		glBindBuffer(GL_ARRAY_BUFFER, chunk->vbo);
-		glVertexAttribIPointer(1, 1, GL_INT, sizeof(Tile), (void*) offsetof(Tile, tile));
-		glEnableVertexAttribArray(1);
-		glVertexAttribDivisor(1, 1);
-		glVertexAttribIPointer(2, 1, GL_INT, sizeof(Tile), (void*) offsetof(Tile, cset));
-		glEnableVertexAttribArray(2);
-		glVertexAttribDivisor(2, 1);
+				current_shader = TILECHUNK;
+			}
+			auto& chunk = chunks[chunk_order[ci]];
 
-		glBindVertexArray(vao);
-		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, chunk->width * chunk->height);
+			tile_shader.set(tile_slots.tileset, chunk.chunk->tileset->bind(0));
+			tile_shader.set(tile_slots.chunk_size, (int)chunk.chunk->width);
+			tile_shader.set(tile_slots.offset, chunk.x, chunk.y);
+			// Convention: Display Color 0 on layers 0 and below.
+			tile_shader.set(tile_slots.transparent_color0, chunk.layer > 0);
+
+			glBindBuffer(GL_ARRAY_BUFFER, chunk.chunk->vbo);
+			glVertexAttribIPointer(1, 1, GL_INT, sizeof(Tile), (void*)offsetof(Tile, tile));
+			glEnableVertexAttribArray(1);
+			glVertexAttribDivisor(1, 1);
+			glVertexAttribIPointer(2, 1, GL_INT, sizeof(Tile), (void*)offsetof(Tile, cset));
+			glEnableVertexAttribArray(2);
+			glVertexAttribDivisor(2, 1);
+
+			glBindVertexArray(vao);
+			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, chunk.chunk->width * chunk.chunk->height);
+
+			ci++;
+		}
+		else {
+			if (current_shader != SPRITE) {
+				sprite_shader.use();
+				sprite_shader.set(sprite_slots.palette, palette->bind(1));
+				sprite_shader.setCamera(camera);
+
+				glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+				glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+				glEnableVertexAttribArray(0);
+
+				current_shader = SPRITE;
+			}
+			// Figure out how many sprites in a row can be drawn
+			auto ss = sprites[sprite_order[si]].spritesheet;
+			u32 lookahead;
+			for (lookahead = si + 1; lookahead < slen; lookahead++) {
+				// scan until we find a sprite with either a different spritesheet or one that would go over the next chunk
+				if (ci < clen && chunks[chunk_order[ci]].layer <= sprite_attrs[lookahead].layer
+					|| sprites[sprite_order[lookahead]].spritesheet != ss) break;
+			}
+
+			sprite_shader.set(sprite_slots.spritesheet, const_cast<Texture*>(ss)->bind(0));
+
+			glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
+			// TODO: determine if it's worth it to upgrade to OpenGL 4.2 for glDrawArraysInstancedBaseInstance
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(SpriteAttributes) * (lookahead - si), &sprite_attrs[si]);
+
+			glVertexAttribIPointer(1, 4, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, src_x));
+			glEnableVertexAttribArray(1);
+			glVertexAttribDivisor(1, 1);
+			glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, x));
+			glEnableVertexAttribArray(2);
+			glVertexAttribDivisor(2, 1);
+			glVertexAttribIPointer(3, 1, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, layer));
+			glEnableVertexAttribArray(3);
+			glVertexAttribDivisor(3, 1);
+			glVertexAttribIPointer(4, 1, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, flags));
+			glEnableVertexAttribArray(4);
+			glVertexAttribDivisor(4, 1);
+
+			glBindVertexArray(vao);
+			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, lookahead - si);
+
+			si = lookahead;
+		}
 
 		// TODO: Interleave Sprites
 	}
@@ -186,6 +239,8 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(2);
+	glDisableVertexAttribArray(3);
+	glDisableVertexAttribArray(4);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, screen_width, screen_height);
@@ -235,7 +290,7 @@ u32 Renderer::_sort_chunks(u32* buffer) {
 }
 
 u32 Renderer::_sort_sprites(u32* buffer) {
-	auto len = chunks.fill_index(buffer, SPRITE_MAX);
+	auto len = sprites.fill_index(buffer, SPRITE_MAX);
 	std::sort(buffer, buffer + len, [&](int left, int right) {
 		auto l = sprites[left].attrs.layer;
 		auto r = sprites[right].attrs.layer;
@@ -256,6 +311,36 @@ ChunkID Renderer::add_chunk(const TileChunk* const chunk, float x, float y, i32 
 
 bool Renderer::remove_chunk(const ChunkID id) {
 	return chunks.remove(id);
+}
+
+SpriteID  Renderer::add_sprite(
+	Texture* const spritesheet,
+	float x, float y,
+	i32 layer,
+	i32 src_x, i32 src_y, i32 src_w, i32 src_h,
+	u8 cset,
+	u32 flip,
+	float r, float g, float b, float a,
+	bool show_color0
+) {
+	u32 red   = (u32)((1.f - clamp(r)) * 31.f) << 24;
+	u32 green = (u32)((1.f - clamp(g)) * 31.f) << 19;
+	u32 blue  = (u32)((1.f - clamp(b)) * 31.f) << 14;
+	u32 alpha = (u32)((1.f - clamp(a)) * 31.f) << 9;
+
+	return sprites.add(Sprite{
+		spritesheet,
+		{
+			src_x, src_y, src_w, src_h,
+			x, y,
+			layer,
+			cset | flip | (show_color0 ? SHOW_COLOR0 : 0) | red | green | blue | alpha
+		}
+	});
+}
+
+bool Renderer::remove_sprite(const SpriteID id) {
+	return sprites.remove(id);
 }
 
 
@@ -290,7 +375,7 @@ u32 rotateCW(u32 tile) {
 }
 
 u32 hflip(u32 tile) {
-	return tile ^ ((tile & DFLIP) ? VFLIP : HFLIP);
+	return tile ^ ((tile & DFLIP)? VFLIP : HFLIP);
 }
 
 u32 vflip(u32 tile) {
@@ -301,15 +386,10 @@ u32 transpose(u32 tile) {
 	return tile ^ DFLIP;
 }
 
-u32 dither(u32 tile, u32 x_mult, u32 y_mult, u32 mod, u32 phase, bool parity) {
-	assert(x_mult < 4 && y_mult < 4 && mod <= 8 && mod > 0 && phase < 8);
-	return (x_mult << 30) | (y_mult << 28) | ((mod - 1) << 25) | (phase << 22) | (parity * 0x00200000u) | (tile & 0x000FFFFF);
-}
-
-u32 filter(u32 cset, float r, float g, float b) {
-	u32 red = (u32) ((1.f - clamp(r)) * 255) << 24;
-	u32 green = (u32) ((1.f - clamp(g)) * 255) << 16;
-	u32 blue = (u32) ((1.f - clamp(b)) * 255) << 8;
-	return red | green | blue | (cset & 0x00003FFF);
+u32 filter_tile(u32 cset, float r, float g, float b) {
+	u32 red = (u32) ((1.f - clamp(r)) * 255.f) << 24;
+	u32 green = (u32) ((1.f - clamp(g)) * 255.f) << 16;
+	u32 blue = (u32) ((1.f - clamp(b)) * 255.f) << 8;
+	return red | green | blue | (cset & 0xFF);
 }
 
