@@ -63,6 +63,7 @@ const char* glslTypeName(GLenum type) {
 	case GL_FLOAT_VEC3: return "vec3";
 	case GL_FLOAT_VEC4: return "vec4";
 	case GL_INT: return "int";
+	case GL_BOOL: return "bool";
 	case GL_UNSIGNED_INT: return "uint";
 	case GL_FLOAT_MAT3: return "mat3";
 	case GL_FLOAT_MAT4: return "mat4";
@@ -71,6 +72,7 @@ const char* glslTypeName(GLenum type) {
 	case GL_SAMPLER_2D_ARRAY: return "sampler2DArray";
 	case GL_INT_SAMPLER_2D_ARRAY: return "isampler2DArray";
 	case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY: return "usampler2DArray";
+	case GL_UNSIGNED_INT_SAMPLER_2D_RECT: return "usamplerRect";
 		// There are more, but this is good enough for now.
 	default: return "???";
 	}

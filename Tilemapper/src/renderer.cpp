@@ -6,9 +6,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "renderer.h"
+#include "text.h"
 
 constexpr int CHUNK_MAX = 64;
 constexpr int SPRITE_MAX = 512;
+constexpr int GLYPH_MAX = 256;
 
 const float tile_vertices[] = {
 	0.f, 0.f,
@@ -18,6 +20,7 @@ const float tile_vertices[] = {
 };
 
 extern int screen_width, screen_height;
+extern Font simple_font;
 
 #ifdef NO_EMBED_SHADERS
 
@@ -50,11 +53,15 @@ extern int screen_width, screen_height;
 #define __S_SL EXPAND(__S) ## _slots
 #define __S_SH EXPAND(__S) ## _shader
 #define __SLOT(VAR) (__S_SL.VAR) = (__S_SH).getSlot(#VAR)
+#ifdef TEXT // Sometimes this is defined. I don't need it. Fuck that macro.
+#undef TEXT
+#endif
 Renderer::Renderer(GLFWwindow* window, int width, int height):
 	window(window),
 	tile_shader(__SHADER(TILECHUNK)),
 	sprite_shader(__SHADER(SPRITE)),
 	scale_shader(__SHADER(SCALE)),
+	text_shader(__SHADER(TEXT)),
 	chunks(CHUNK_MAX),
 	sprites(SPRITE_MAX)
 {
@@ -70,10 +77,14 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 #include "generated/sprite_uniforms.h"
 #undef __S
 
+#define __S text
+#include "generated/text_uniforms.h"
+#undef __S
+
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
 
-	glGenBuffers(1, &tile_vbo);
+	glGenBuffers(3, &tile_vbo);  // Should also create sprite_vbo and text_vbo
 	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(tile_vertices), tile_vertices, GL_STATIC_DRAW);
 
@@ -106,12 +117,17 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
 	framebuffer = new Texture(framebuf);
 
-	sprite_attrs = (SpriteAttributes*) calloc(SPRITE_MAX, sizeof(SpriteAttributes));
-	glGenBuffers(1, &sprite_vbo);
+	sprite_attrs = (SpriteAttributes*)calloc(SPRITE_MAX, sizeof(SpriteAttributes));
+	//glGenBuffers(1, &sprite_vbo); // done earlier
 	glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * SPRITE_MAX, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
 
-	camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 100.f, -100.f);
+	//glGenBuffers(1, &text_vbo); // done earlier
+	glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GlyphRenderData) * GLYPH_MAX, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
+
+	ui_camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 1024.f, -1024.f);
+	world_camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 128.f, -128.f);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -152,7 +168,7 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 			if (current_shader != TILECHUNK) {
 				tile_shader.use();
 				tile_shader.set(tile_slots.palette, palette->bind(1));
-				tile_shader.setCamera(camera);
+				tile_shader.setCamera(world_camera);
 
 				glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 				glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
@@ -187,11 +203,25 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 			if (current_shader != SPRITE) {
 				sprite_shader.use();
 				sprite_shader.set(sprite_slots.palette, palette->bind(1));
-				sprite_shader.setCamera(camera);
+				sprite_shader.setCamera(world_camera);
 
 				glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 				glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 				glEnableVertexAttribArray(0);
+
+				glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
+				glVertexAttribIPointer(1, 4, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, src_x));
+				glEnableVertexAttribArray(1);
+				glVertexAttribDivisor(1, 1);
+				glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, x));
+				glEnableVertexAttribArray(2);
+				glVertexAttribDivisor(2, 1);
+				glVertexAttribIPointer(3, 1, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, layer));
+				glEnableVertexAttribArray(3);
+				glVertexAttribDivisor(3, 1);
+				glVertexAttribIPointer(4, 1, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, flags));
+				glEnableVertexAttribArray(4);
+				glVertexAttribDivisor(4, 1);
 
 				current_shader = SPRITE;
 			}
@@ -206,34 +236,71 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 
 			sprite_shader.set(sprite_slots.spritesheet, const_cast<Texture*>(ss)->bind(0));
 
-			glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
+			// sprite_vbo should already be bound at this point.
+#ifndef NDEBUG
+			{
+				GLint bound_vbo;
+				glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &bound_vbo);
+				assert(bound_vbo == sprite_vbo);
+			}
+#endif
 			// TODO: determine if it's worth it to upgrade to OpenGL 4.2 for glDrawArraysInstancedBaseInstance
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(SpriteAttributes) * (lookahead - si), &sprite_attrs[si]);
-
-			glVertexAttribIPointer(1, 4, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, src_x));
-			glEnableVertexAttribArray(1);
-			glVertexAttribDivisor(1, 1);
-			glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, x));
-			glEnableVertexAttribArray(2);
-			glVertexAttribDivisor(2, 1);
-			glVertexAttribIPointer(3, 1, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, layer));
-			glEnableVertexAttribArray(3);
-			glVertexAttribDivisor(3, 1);
-			glVertexAttribIPointer(4, 1, GL_INT, sizeof(SpriteAttributes), (void*)offsetof(SpriteAttributes, flags));
-			glEnableVertexAttribArray(4);
-			glVertexAttribDivisor(4, 1);
 
 			glBindVertexArray(vao);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, lookahead - si);
 
 			si = lookahead;
 		}
-
-		// TODO: Interleave Sprites
 	}
 
 	// TODO: UI
-	// TODO: Print FPS
+	// Print FPS
+	if (show_fps) {
+		char fps_msg[32];
+		u32 fps_color = fps > 55.f ? 0x00FF00 : fps > 25.f ? 0xFFFF00 : 0xFF0000;
+		snprintf(fps_msg, sizeof(fps_msg), "#%06x;%d FPS", fps_color, (int)fps);
+		GlyphRenderData fps_glyphs[GLYPH_MAX];
+		int n_glyphs = simple_font.print(fps_glyphs, 16, fps_msg, 1, 1);
+		assert(n_glyphs >= 0);
+
+		text_shader.use();
+		text_shader.setCamera(ui_camera);
+		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
+		//text_shader.set(text_slots.layer, 500.f);
+
+		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
+
+		glVertexAttribIPointer(1, 4, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, src_x));
+		glEnableVertexAttribArray(1);
+		glVertexAttribDivisor(1, 1);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, x));
+		glEnableVertexAttribArray(2);
+		glVertexAttribDivisor(2, 1);
+		glVertexAttribIPointer(3, 1, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, rgba));
+		glEnableVertexAttribArray(3);
+		glVertexAttribDivisor(3, 1);
+
+		glBindVertexArray(vao);
+		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+
+		n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "The quick brown fox\n#00FFFF;jumps#; over the lazy dog.", 88, 74);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
+		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+
+		n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "HOW VEXINGLY QUICK\nDAFT ZEBRAS JUMP!\nLycanthrope\nLVA", 88, 100);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
+		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+
+		n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "0123456789ABCDEF.", 300, 20);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
+		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+	}
 
 	// virtual resolution scaling
 
@@ -269,7 +336,7 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 
 #ifndef NDEBUG
 	float render_time = glfwGetTime() - start_time;
-	if (render_time > 0.016666f)
+	if (render_time > 0.01)
 	{
 		printf("ALERT: Render took %.2fms this frame\n", render_time * 1000.f);
 	}

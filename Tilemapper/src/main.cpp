@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "renderer.h"
+#include "text.h"
 
 //int screen_width = 1280;
 int screen_width = 512 * 3;
@@ -54,6 +55,7 @@ int main(int argc, char* argv[]) {
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	{
+		init_simple_font();
 		Renderer renderer(window, 512, 288);
 		//Renderer renderer(window, 32, 32);
 
@@ -69,7 +71,7 @@ int main(int argc, char* argv[]) {
 		auto blah_base_y = blah->y;
 
 		auto spritesheet = load_spritesheet("assets/tileset24bit.png");
-		renderer.add_sprite(spritesheet, 120.f, 74.f, 1, 34, 62, 18, 12, 0);
+		renderer.add_sprite(spritesheet, 120.f, 74.f, 1, 0, 0, 16, 16, 0);
 		renderer.add_sprite(spritesheet, 10.f, 11.f, 0, 17, 2, 8, 8, 0);
 		auto meh = renderer.add_sprite(spritesheet, 127.f, 90.f, 2, 47, 93, 15, 21, 0);
 		auto meh_base_x = meh->attrs.x;
@@ -80,7 +82,7 @@ int main(int argc, char* argv[]) {
 		float base_sharp = renderer.get_sharpness();
 		bool pressed = false;
 		float last_frame_time = glfwGetTime();
-		float frame_period = 0.f;
+		float frame_period = 0.016667f;
 
 		while(!glfwWindowShouldClose(window))
 		{

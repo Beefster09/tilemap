@@ -124,7 +124,7 @@ Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int o
 }
 
 Texture* load_spritesheet(const char* image_file) {
-	stbi_set_flip_vertically_on_load(true);
+	stbi_set_flip_vertically_on_load(false);
 	int width, height, n_channels;
 	unsigned char *image_data = stbi_load(image_file, &width, &height, &n_channels, 0);
 

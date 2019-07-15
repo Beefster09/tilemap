@@ -58,8 +58,8 @@ private:
 	GLFWwindow* const window;
 	int v_width, v_height; // virtual resolution
 
-	GLuint vao, tile_vbo, fbo, sprite_vbo;
-	Shader tile_shader, scale_shader, sprite_shader;
+	GLuint vao, fbo, tile_vbo, sprite_vbo, text_vbo;
+	Shader tile_shader, scale_shader, sprite_shader, text_shader;
 
 #define __SLOT(VAR) int VAR;
 	struct {
@@ -71,6 +71,9 @@ private:
 	struct {
 #include "generated/sprite_uniforms.h"
 	} sprite_slots;
+	struct {
+#include "generated/text_uniforms.h"
+	} text_slots;
 #undef __SLOT
 
 	Palette* palette;
@@ -79,9 +82,11 @@ private:
 
 	Table<ChunkEntry> chunks;
 	Table<Sprite> sprites;
-	SpriteAttributes* sprite_attrs;
 
-	glm::mat4 camera;
+	SpriteAttributes* sprite_attrs;
+	//GlyphRenderData* text_render_buffer;
+
+	glm::mat4 world_camera, ui_camera;
 	float scaling_sharpness = 2.f;
 	float last_frame_time = 1.f;
 
