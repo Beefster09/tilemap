@@ -43,7 +43,6 @@ if __name__ == '__main__':
     else:
         out = sys.stdout
 
-    print('#pragma once', file=out)
     for infile in args.files:
         var = make_id(infile, args.prefix, args.suffix)
         print(file=out)

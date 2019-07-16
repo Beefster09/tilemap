@@ -90,8 +90,10 @@ int main(int argc, char* argv[]) {
 
 			float time = glfwGetTime();
 			float diff = time - last_frame_time;
+			if (diff < frame_period * 5.f) { // ignore outliers
+				frame_period = (frame_period * FPS_SMOOTHING) + (diff * (1.f - FPS_SMOOTHING));
+			}
 			last_frame_time = time;
-			frame_period = (frame_period * FPS_SMOOTHING) + (diff * (1.f - FPS_SMOOTHING));
 			float fps = 1.f / frame_period;
 
 			blah->x = 96 * sinf(time * TAU * 0.8) + blah_base_x;
@@ -121,7 +123,9 @@ int main(int argc, char* argv[]) {
 					}
 				}
 			}
-
+			renderer.print_text(88, 74, "The quick brown fox\n#c[00FFFF]jumps#0 over the lazy dog.");
+			renderer.print_text(88, 100, "HOW\tVEXINGLY\tQUICK\nDAFT\tZEBRAS\tJUMP!\nLycanthrope: Werewolf.\nLVA\niji\nf_J,T.V,P.");
+			renderer.print_text(300, 20, "01234,56789_ABC;DEF.##$");
 			renderer.draw_frame(fps, true);
 
 			logOpenGLErrors();

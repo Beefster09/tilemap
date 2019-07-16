@@ -7,6 +7,51 @@
 #include "text.h"
 
 constexpr int ASCII_START = 33;
+constexpr int TAB_LENGTH = 8; // Number of spaces that make up a tab
+
+static bool handle_color_code(const char* const fulltext, const char* const c, u32* color, const char** end) {
+	*end = strchr(c, ']');
+	if (!*end) {
+		fprintf(stderr, "TEXT ERROR: Set Color Control Code is not followed with ']'.\n  From: \"%s\"\n", fulltext);
+		return false;
+	}
+	auto count = (u32)(*end - c);
+	for (int i = 0; i < count; i++) {
+		if (!(c[i] >= '0' && c[i] <= '9'
+			|| c[i] >= 'A' && c[i] <= 'F'
+			|| c[i] >= 'a' && c[i] <= 'f')) {
+			fprintf(stderr, "TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"\n", fulltext);
+			return false;
+		}
+	}
+	switch (count) {
+	case 0: {
+		*color = 0xFFFFFFFF;
+		break;
+	}
+	case 3: {  // RGB
+		break;
+	}
+	case 4: {  // RGBA
+		break;
+	}
+	case 6: {  // RRGGBB
+		*color = strtoul(c, nullptr, 16);
+		*color <<= 8;
+		*color |= 0xff;
+		break;
+	}
+	case 8: {  // RRGGBBAA
+		*color = strtoul(c, nullptr, 16);
+		break;
+	}
+	default: {
+		fprintf(stderr, "TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"\n", fulltext);
+		return false;
+	}
+	}
+	return true;
+}
 
 int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* const text, float x, float y) {
 	int len = 0;
@@ -18,53 +63,44 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* cons
 			x_offset = 0;
 			y_offset += line_height;
 		}
+		else if (*c == '\t') {
+			auto tab = TAB_LENGTH * space_width;
+			x_offset = x_offset / tab * tab + tab;
+		}
 		else if (*c == ' ') {
 			x_offset += space_width;
 		}
-		else if (*c == '#') { // Color control character; double up to get literal #
-			c++;
-			if (*c == '#') goto handle_ascii; // I'm sorry for being a terrible person :(
-			auto end = strchr(c, ';');
-			if (!end) {
-				fprintf(stderr, "TEXT ERROR: Set Color Control Code is not followed with ';'.\n  From: \"%s\"\n", text);
-				return -1;
-			}
-			auto count = (u32)(end - c);
-			for (int i = 0; i < count; i++) {
-				if (!(c[i] >= '0' && c[i] <= '9'
-				  || c[i] >= 'A' && c[i] <= 'F'
-				  || c[i] >= 'a' && c[i] <= 'f')) {
-					fprintf(stderr, "TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"\n", text);
+		else if (*c == '#') { // Control character; double up to get literal #
+			switch (c[1]) {
+			case '#':
+				c++; goto handle_ascii;
+			case 'c': case 'C': { // color
+				if (c[2] != '[') {
+					fprintf(stderr, "Found color control without '[' in string '%s'", text);
+				}
+				const char* end;
+				if (handle_color_code(text, c + 3, &rgba, &end)) {
+					c = end;
+				}
+				else {
 					return -1;
 				}
+				break;
 			}
-			switch (count) {
-			case 0: {
+			case '0': { // Reset all attributes
+				c++;
 				rgba = 0xFFFFFFFF;
 				break;
 			}
-			case 3: {  // RGB
-				break;
-			}
-			case 4: {  // RGBA
-				break;
-			}
-			case 6: {  // RRGGBB
-				rgba = strtoul(c, nullptr, 16);
-				rgba <<= 8;
-				rgba |= 0xff;
-				break;
-			}
-			case 8: {  // RRGGBBAA
-				rgba = strtoul(c, nullptr, 16);
-				break;
+			case 0: {
+				fprintf(stderr, "Found '#' at end of string '%s'\n", text);
+				goto handle_ascii;
 			}
 			default: {
-				fprintf(stderr, "TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"\n", text);
+				fprintf(stderr, "Unsupported control code #%c in string '%s'\n", c[1], text);
 				return -1;
 			}
 			}
-			c = end;
 		}
 		else if (*c >= ASCII_START && *c < 127) {
 			handle_ascii:
@@ -87,90 +123,14 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* cons
 	return len;
 }
 
-#define X 255,
-#define _ 0,
-// The bitmap needs padding Because openGL apparently has a minimum texture size.
-#define PADDING 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,
-const u8 SIMPLE_FONT_BITMAP[] = {
-	//  0           1           2           3           4               5           6           7           8           9
-	_ X X X _   _ X X _ _   _ X X X _   _ X X X _   X _ _ _ X       X X X X X   _ X X X _   X X X X X   _ X X X _   _ X X X _      PADDING
-	X _ _ _ X   _ _ X _ _   X _ _ _ X   X _ _ _ X   X _ _ _ X       X _ _ _ _   X _ _ _ X   _ _ _ _ X   X _ _ _ X   X _ _ _ X      PADDING
-	X _ _ _ X   _ _ X _ _   _ _ _ _ X   _ _ _ _ X   X _ _ _ X       X _ _ _ _   X _ _ _ _   _ _ _ X _   X _ _ _ X   X _ _ _ X      PADDING
-	X _ X _ X   _ _ X _ _   _ _ X X _   _ _ X X _   X X X X X       X X X X _   X X X X _   _ _ _ X _   _ X X X _   _ X X X X      PADDING
-	X _ _ _ X   _ _ X _ _   _ X _ _ _   _ _ _ _ X   _ _ _ _ X       _ _ _ _ X   X _ _ _ X   _ _ X _ _   X _ _ _ X   _ _ _ _ X      PADDING
-	X _ _ _ X   _ _ X _ _   X _ _ _ _   X _ _ _ X   _ _ _ _ X       X _ _ _ X   X _ _ _ X   _ _ X _ _   X _ _ _ X   X _ _ _ X      PADDING
-	_ X X X _   X X X X X   X X X X X   _ X X X _   _ _ _ _ X       _ X X X _   _ X X X _   _ _ X _ _   _ X X X _   _ X X X _      PADDING
-	//  A           B           C           D           E               F           G           H           I           J
-	_ _ X _ _   X X X X _   _ X X X _   X X X X _   X X X X X       X X X X X   _ X X X _   X _ _ _ X   X X X X X   _ X X X X      PADDING
-	_ X _ X _   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ _       X _ _ _ _   X _ _ _ X   X _ _ _ X   _ _ X _ _   _ _ _ X _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ _   X _ _ _ X   X _ _ _ _       X _ _ _ _   X _ _ _ _   X _ _ _ X   _ _ X _ _   _ _ _ X _      PADDING
-	X _ _ _ X   X X X X _   X _ _ _ _   X _ _ _ X   X X X X _       X X X X _   X _ X X X   X X X X X   _ _ X _ _   _ _ _ X _      PADDING
-	X X X X X   X _ _ _ X   X _ _ _ _   X _ _ _ X   X _ _ _ _       X _ _ _ _   X _ _ _ X   X _ _ _ X   _ _ X _ _   _ _ _ X _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ _       X _ _ _ _   X _ _ _ X   X _ _ _ X   _ _ X _ _   X _ _ X _      PADDING
-	X _ _ _ X   X X X X _   _ X X X _   X X X X _   X X X X X       X _ _ _ _   _ X X X _   X _ _ _ X   X X X X X   _ X X _ _      PADDING
-	//  K           L           M           N           O               P           Q           R           S           T
-	X _ _ _ X   X _ _ _ _   X _ _ _ X   X _ _ _ X   _ X X X _       X X X X _   _ X X X _   X X X X _   _ X X X _   X X X X X      PADDING
-	X _ _ X _   X _ _ _ _   X X _ X X   X X _ _ X   X _ _ _ X       X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X   _ _ X _ _      PADDING
-	X _ X _ _   X _ _ _ _   X _ X _ X   X _ X _ X   X _ _ _ X       X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ _   _ _ X _ _      PADDING
-	X X _ _ _   X _ _ _ _   X _ _ _ X   X _ X _ X   X _ _ _ X       X X X X _   X _ _ _ X   X X X X _   _ X X X _   _ _ X _ _      PADDING
-	X _ X _ _   X _ _ _ _   X _ _ _ X   X _ X _ X   X _ _ _ X       X _ _ _ _   X _ X _ X   X _ _ X _   _ _ _ _ X   _ _ X _ _      PADDING
-	X _ _ X _   X _ _ _ _   X _ _ _ X   X _ _ X X   X _ _ _ X       X _ _ _ _   X _ _ X _   X _ _ _ X   X _ _ _ X   _ _ X _ _      PADDING
-	X _ _ _ X   X X X X X   X _ _ _ X   X _ _ _ X   _ X X X _       X _ _ _ _   _ X X _ X   X _ _ _ X   _ X X X _   _ _ X _ _      PADDING
-	//  U           V           W           X           Y               Z      !,.;:
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X       X X X X X   X X _ _ _   X X X X _   _ X X X _   X X X X X      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X       _ _ _ _ X   X X _ _ _   X _ _ _ X   X _ _ _ X   _ _ X _ _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   _ X _ X _   _ X _ X _       _ _ _ X _   X X _ _ X   X _ _ _ X   X _ _ _ _   _ _ X _ _      PADDING
-	X _ _ _ X   _ X _ X _   X _ _ _ X   _ _ X _ _   _ _ X _ _       _ _ X _ _   X X _ _ X   X X X X _   _ X X X _   _ _ X _ _      PADDING
-	X _ _ _ X   _ X _ X _   X _ X _ X   _ X _ X _   _ _ X _ _       _ X _ _ _   _ _ _ _ X   X _ _ X _   _ _ _ _ X   _ _ X _ _      PADDING
-	X _ _ _ X   _ _ X _ _   X X _ X X   X _ _ _ X   _ _ X _ _       X _ _ _ _   X X _ X _   X _ _ _ X   X _ _ _ X   _ _ X _ _      PADDING
-	_ X X X _   _ _ X _ _   X _ _ _ X   X _ _ _ X   _ _ X _ _       X X X X X   X X _ _ X   X _ _ _ X   _ X X X _   _ _ X _ _      PADDING
-	//  a           b           c           d           e               f           g           h       i    j
-	_ _ _ _ _   X _ _ _ _   _ _ _ _ _   _ _ _ _ X   _ _ _ _ _       _ _ X X _   _ X X X _   X _ _ _ _   X _ _ _ X   _ _ _ _ _      PADDING
-	_ _ _ _ _   X _ _ _ _   _ _ _ _ _   _ _ _ _ X   _ _ _ _ _       _ X _ _ _   X _ _ _ X   X _ _ _ _   _ _ _ _ _   _ _ _ _ _      PADDING
-	_ X X X _   X X X X _   _ X X X _   _ X X X X   _ X X X _       _ X _ _ _   X _ _ _ X   X X X X _   X _ _ _ X   _ _ _ _ _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X       X X X _ _   X _ _ _ X   X _ _ _ X   X _ _ _ X   _ _ _ _ _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ _   X _ _ _ X   X X X X _       _ X _ _ _   _ X X X X   X _ _ _ X   X _ _ _ X   _ _ _ _ _      PADDING
-	X _ _ X X   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ _       _ X _ _ _   _ _ _ _ X   X _ _ _ X   X _ _ _ X   _ _ _ _ _      PADDING
-	_ X X _ X   X X X X _   _ X X X _   _ X X X X   _ X X X X       _ X _ _ _   _ X X X _   X _ _ _ X   X _ _ _ X   _ _ _ _ _      PADDING
-	//  k           l           m           n           o               p           q           r           s           t
-	X _ _ _ _   X _ _ _ _   _ _ _ _ _   _ _ _ _ _   _ _ _ _ _       X X X X _   _ X X X _   _ _ _ _ _   _ X _ _ X   _ X _ _ _      PADDING
-	X _ _ _ _   X _ _ _ _   _ _ _ _ _   _ _ _ _ _   _ _ _ _ _       X _ _ _ X   X _ _ _ X   _ _ _ _ _   _ _ X X _   _ X _ _ _      PADDING
-	X _ _ X _   X _ _ _ _   X X _ X _   X X X X _   _ X X X _       X _ _ _ X   X _ _ _ X   _ X X X _   _ X X X X   X X X _ _      PADDING
-	X _ X _ _   X _ _ _ _   X _ X _ X   X _ _ _ X   X _ _ _ X       X _ _ _ X   X _ _ _ X   X _ _ _ _   X _ _ _ _   _ X _ _ _      PADDING
-	X X _ _ _   X _ _ _ _   X _ X _ X   X _ _ _ X   X _ _ _ X       X X X X _   _ X X X X   X _ _ _ _   _ X X X _   _ X _ _ _      PADDING
-	X _ X _ _   X _ _ _ _   X _ X _ X   X _ _ _ X   X _ _ _ X       X _ _ _ _   _ _ _ _ X   X _ _ _ _   _ _ _ _ X   _ X _ _ _      PADDING
-	X _ _ X _   X _ _ _ _   X _ X _ X   X _ _ _ X   _ X X X _       X _ _ _ _   _ _ _ _ X   X _ _ _ _   X X X X _   _ _ X _ _      PADDING
-	//  u           v           w           x           y               z
-	_ _ _ _ _   _ _ _ _ _   _ _ _ _ _   _ _ _ _ _   X _ _ _ X       _ _ _ _ _   _ X X X _   X X X X _   _ X X X _   X X X X X      PADDING
-	_ _ _ _ _   _ _ _ _ _   _ _ _ _ _   _ _ _ _ _   X _ _ _ X       _ _ _ _ _   X _ _ _ X   X _ _ _ X   X _ _ _ X   _ _ X _ _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X   X _ _ _ X       X X X X X   X _ _ _ X   X _ _ _ X   X _ _ _ _   _ _ X _ _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ _ _ X   _ X _ X _   X _ _ _ X       _ _ _ X _   X _ _ _ X   X X X X _   _ X X X _   _ _ X _ _      PADDING
-	X _ _ _ X   X _ _ _ X   X _ X _ X   _ _ X _ _   _ X X X X       _ _ X _ _   X _ X _ X   X _ _ X _   _ _ _ _ X   _ _ X _ _      PADDING
-	X _ _ _ X   _ X _ X _   X X _ X X   _ X _ X _   _ _ _ _ X       _ X _ _ _   X _ _ X _   X _ _ _ X   X _ _ _ X   _ _ X _ _      PADDING
-	_ X X X _   _ _ X _ _   X _ _ _ X   X _ _ _ X   _ X X X _       X X X X X   _ X X _ X   X _ _ _ X   _ X X X _   _ _ X _ _      PADDING
-};
-#undef X
-const i32 LOWERCASE_WIDTHS[] = {
-	//  a  b  c  d  e    f  g  h  i  j
-		5, 5, 5, 5, 5,   4, 5, 5, 1, 4,
-	//  k  l  m  n  o    p  q  r  s  t
-		4, 1, 5, 5, 5,   5, 5, 4, 5, 3,
-	//  u  v  w  x  y    z
-		5, 5, 5, 5, 5,   5
-};
-//const char LOWERCASE_TAILS[] = "gpqy";
-
-constexpr int SIMPLE_FONT_BITMAP_WIDTH = 64;
-constexpr int SIMPLE_FONT_BITMAP_HEIGHT = 7 * 7;
-
-Font simple_font;
+#include "generated/simple_font.h"
 
 void init_simple_font() {
 	GLuint tex_handle;
 	glGenTextures(1, &tex_handle);
 	glBindTexture(GL_TEXTURE_RECTANGLE, tex_handle);
 
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8UI, SIMPLE_FONT_BITMAP_WIDTH, SIMPLE_FONT_BITMAP_HEIGHT, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, SIMPLE_FONT_BITMAP);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8UI, simple_font__bitmap_width, simple_font__bitmap_height, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, simple_font__bitmap);
 
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -179,33 +139,7 @@ void init_simple_font() {
 
 	simple_font.glyph_atlas = new Texture(tex_handle, GL_TEXTURE_RECTANGLE);
 
-	for (int i = 0; i <= 9; i++) {
-		simple_font.ascii_glyphs['0' + i - ASCII_START] = { 5 * i, 0, 5, 7, 6 };
+	for (int i = 0; i < sizeof(simple_font__kerning) / sizeof(int); i += 3) {
+		simple_font.kern_pairs[simple_font__kerning[i]][simple_font__kerning[i + 1]] = simple_font__kerning[i + 2];
 	}
-	for (int i = 0; i <= 'Z' - 'A'; i++) {
-		simple_font.ascii_glyphs['A' + i - ASCII_START] = { 5 * (i % 10), 7 * (1 + i / 10), 5, 7, 6 };
-	}
-	for (int i = 0; i <= 'z' - 'a'; i++) {
-		if (i == 'j' - 'a' || i == 's' - 'a') continue; // j and s are odd exceptions
-		simple_font.ascii_glyphs['a' + i - ASCII_START] = { 5 * (i % 10), 7 * (4 + i / 10), LOWERCASE_WIDTHS[i], 7, LOWERCASE_WIDTHS[i] + 1 };
-	}
-	simple_font.ascii_glyphs['j' - ASCII_START] = { 41, 28, 4, 9, 5 };
-	simple_font.ascii_glyphs['s' - ASCII_START] = { 40, 37, 5, 5, 6, 0, 2 };
-	for (const char* tail = "gpqy"; *tail; tail++) {
-		simple_font.ascii_glyphs[*tail - ASCII_START].offset_y = 2;
-	}
-#define GLYPH(CH, ...) simple_font.ascii_glyphs[CH - ASCII_START] = { __VA_ARGS__ }
-	GLYPH('!', 30, 21, 2, 7, 3);
-	GLYPH(':', 30, 23, 2, 5, 3, 0, 1);
-	GLYPH(';', 30, 23, 2, 6, 3, 0, 1);
-	GLYPH('.', 30, 26, 2, 2, 3, 0, 5);
-	GLYPH(',', 30, 26, 2, 3, 3, 0, 5);
-
-	simple_font.kern_pairs['L']['Y'] = -1;
-	simple_font.kern_pairs['L']['V'] = -1;
-	for (const char* c = "acdegmnopqrsuvwxyz"; *c; c++) {
-		simple_font.kern_pairs['f'][*c] = -1;
-	}
-	simple_font.line_height = 10;
-	simple_font.space_width = 4;
 }

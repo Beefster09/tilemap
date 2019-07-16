@@ -2,8 +2,15 @@
 
 #include "shader.h"
 #include "table.h"
+#include "text.h"
 
 class Renderer;
+struct GlyphPrintData;
+
+enum CoordinateSystem {
+	WORLD_SPACE,
+	SCREEN_SPACE
+};
 
 struct Tile {
 	u32 tile;
@@ -85,14 +92,21 @@ private:
 
 	SpriteAttributes* sprite_attrs;
 	//GlyphRenderData* text_render_buffer;
+	GlyphPrintData* print_later_ws_start;
+	GlyphPrintData* print_later_ws;
+	GlyphPrintData* print_later_ss_start;
+	GlyphPrintData* print_later_ss;
 
 	glm::mat4 world_camera, ui_camera;
 	float scaling_sharpness = 2.f;
-	float last_frame_time = 1.f;
+
+	char* temp_string_storage;
+	char* string_storage_next;
 
 	u32 _sort_chunks(u32 * buffer);
 	u32 _sort_sprites(u32 * buffer);
 
+	bool _print_text(Font* font, CoordinateSystem coords, float x, float y, const char* format, va_list args);
 public:
 	Renderer(GLFWwindow* window, int width, int height);
 	void draw_frame(float fps, bool show_fps);
@@ -119,6 +133,11 @@ public:
 		bool show_color0 = false
 	);
 	bool remove_sprite(const SpriteID id);
+
+	bool print_text(Font* font, CoordinateSystem coords, float x, float y, const char* format, ...);
+	bool print_text(CoordinateSystem coords, float x, float y, const char* format, ...);
+	bool print_text(Font* font, float x, float y, const char* format, ...);
+	bool print_text(float x, float y, const char* format, ...);
 };
 
 // tile modifiers

@@ -11,6 +11,17 @@
 constexpr int CHUNK_MAX = 64;
 constexpr int SPRITE_MAX = 512;
 constexpr int GLYPH_MAX = 256;
+constexpr int STRING_STORAGE_SIZE = 1024 * 16;
+constexpr int PRINT_CMD_WS_MAX = 32;
+constexpr int PRINT_CMD_SS_MAX = 96;
+
+
+struct GlyphPrintData {
+	Font* font;
+	const char* text;
+	float x;
+	float y;
+};
 
 const float tile_vertices[] = {
 	0.f, 0.f,
@@ -125,6 +136,13 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	//glGenBuffers(1, &text_vbo); // done earlier
 	glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(GlyphRenderData) * GLYPH_MAX, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
+
+	temp_string_storage = (char*)malloc(STRING_STORAGE_SIZE);
+	string_storage_next = temp_string_storage;
+	print_later_ws_start = (GlyphPrintData*)malloc(sizeof(GlyphPrintData) * PRINT_CMD_WS_MAX);
+	print_later_ws = print_later_ws_start;
+	print_later_ss_start = (GlyphPrintData*)malloc(sizeof(GlyphPrintData) * PRINT_CMD_SS_MAX);
+	print_later_ss = print_later_ss_start;
 
 	ui_camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 1024.f, -1024.f);
 	world_camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 128.f, -128.f);
@@ -254,19 +272,16 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 		}
 	}
 
-	// TODO: UI
-	// Print FPS
-	if (show_fps) {
-		char fps_msg[32];
-		u32 fps_color = fps > 55.f ? 0x00FF00 : fps > 25.f ? 0xFFFF00 : 0xFF0000;
-		snprintf(fps_msg, sizeof(fps_msg), "#%06x;%d FPS", fps_color, (int)fps);
-		GlyphRenderData fps_glyphs[GLYPH_MAX];
-		int n_glyphs = simple_font.print(fps_glyphs, 16, fps_msg, 1, 1);
-		assert(n_glyphs >= 0);
 
+	// Print ALL the text!
+	GlyphRenderData glyph_buffer[GLYPH_MAX];
+
+	if ( // If there is text to print, get the text shader warmed up.
+		show_fps
+		|| print_later_ws > print_later_ws_start
+		|| print_later_ss > print_later_ss_start
+	) {
 		text_shader.use();
-		text_shader.setCamera(ui_camera);
-		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
 		//text_shader.set(text_slots.layer, 500.f);
 
 		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
@@ -274,7 +289,6 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
 
 		glVertexAttribIPointer(1, 4, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, src_x));
 		glEnableVertexAttribArray(1);
@@ -285,29 +299,61 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 		glVertexAttribIPointer(3, 1, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, rgba));
 		glEnableVertexAttribArray(3);
 		glVertexAttribDivisor(3, 1);
+	}
 
+	if (print_later_ws > print_later_ws_start) {
+		text_shader.setCamera(world_camera);
+		for (auto it = print_later_ws_start; it < print_later_ws; it++) {
+			int n_glyphs = it->font->print(glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
+			text_shader.set(text_slots.glyph_atlas, it->font->glyph_atlas->bind(0));
+
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
+			glBindVertexArray(vao);
+			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+		}
+	}
+
+	if (print_later_ss > print_later_ss_start) {
+		text_shader.setCamera(ui_camera);
+		for (auto it = print_later_ss_start; it < print_later_ss; it++) {
+			int n_glyphs = it->font->print(glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
+			text_shader.set(text_slots.glyph_atlas, it->font->glyph_atlas->bind(0));
+
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
+			glBindVertexArray(vao);
+			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+		}
+	}
+
+	// Print FPS
+	if (show_fps) {
+		char fps_msg[32];
+		u32 fps_color = fps > 55.f ? 0x00FF00 : fps > 25.f ? 0xFFFF00 : 0xFF0000;
+		snprintf(fps_msg, sizeof(fps_msg), "#c[%06x]%d FPS", fps_color, (int)fps);
+		int n_glyphs = simple_font.print(glyph_buffer, 16, fps_msg, 1, 1);
+		assert(n_glyphs >= 0);
+
+		if (!(print_later_ss > print_later_ss_start)) {
+			text_shader.setCamera(ui_camera);
+		}
+		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
+		//text_shader.set(text_slots.layer, 500.f);
+
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 		glBindVertexArray(vao);
 		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
 
-		n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "The quick brown fox\n#00FFFF;jumps#; over the lazy dog.", 88, 74);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
-		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
-
-		n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "HOW VEXINGLY QUICK\nDAFT ZEBRAS JUMP!\nLycanthrope\nLVA", 88, 100);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
-		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
-
-		n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "0123456789ABCDEF.", 300, 20);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, fps_glyphs);
-		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+		//n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "The quick brown fox\n#c[00FFFF]jumps#0 over the lazy dog.", 88, 74);
+		//n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "HOW VEXINGLY QUICK\nDAFT ZEBRAS JUMP!\nLycanthrope\nLVA", 88, 100);
+		//n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "0123456789ABCDEF.", 300, 20);
 	}
 
-	// virtual resolution scaling
+	//glDisableVertexAttribArray(1);
+	//glDisableVertexAttribArray(2);
+	//glDisableVertexAttribArray(3);
+	//glDisableVertexAttribArray(4);
 
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(2);
-	glDisableVertexAttribArray(3);
-	glDisableVertexAttribArray(4);
+	// virtual resolution scaling
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, screen_width, screen_height);
@@ -342,8 +388,55 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 	}
 #endif
 
+	string_storage_next = temp_string_storage;
+	print_later_ws = print_later_ws_start;
+	print_later_ss = print_later_ss_start;
+
 	glfwSwapBuffers(window);
 }
+
+bool Renderer::_print_text(Font* font, CoordinateSystem coords, float x, float y, const char* const format, va_list args) {
+	if (coords == WORLD_SPACE && print_later_ws - print_later_ws_start >= PRINT_CMD_WS_MAX) {
+		fprintf(stderr, "Out of world space text slots.\n");
+		return false;
+	}
+	else if (coords == SCREEN_SPACE && print_later_ss - print_later_ss_start >= PRINT_CMD_SS_MAX) {
+		fprintf(stderr, "Out of screen space text slots.\n");
+		return false;
+	}
+	int text_memory_remaining = STRING_STORAGE_SIZE - (string_storage_next - temp_string_storage);
+	// Check how much space is required
+	auto text = string_storage_next;
+	int len = vsnprintf(string_storage_next, text_memory_remaining, format, args);
+	if (len < 0 || len + 1 > text_memory_remaining) {
+		fprintf(stderr, "Not enough string storage memory.\n");
+		return false;
+	}
+	string_storage_next += len + 2; // +1 to get to the '\0', +1 to get to the character after.
+	if (coords == WORLD_SPACE) {
+		*print_later_ws++ = { font, text, x, y };
+	}
+	else if (coords == SCREEN_SPACE) {
+		*print_later_ss++ = { font, text, x, y };
+	}
+	return true;
+}
+
+#define _HANDOFF(FONT, COORDS) {\
+	va_list args;\
+	int n_args;\
+	va_start(args, n_args);\
+	bool ret = _print_text((FONT), (COORDS), x, y, format, args);\
+	va_end(args);\
+	return ret;\
+}
+
+bool Renderer::print_text(Font* font, CoordinateSystem coords, float x, float y, const char* format, ...) _HANDOFF(font, coords)
+bool Renderer::print_text(CoordinateSystem coords, float x, float y, const char* format, ...)             _HANDOFF(&simple_font, coords)
+bool Renderer::print_text(Font* font, float x, float y, const char* format, ...)                          _HANDOFF(font, SCREEN_SPACE)
+bool Renderer::print_text(float x, float y, const char* format, ...)                                      _HANDOFF(&simple_font, SCREEN_SPACE)
+
+#undef _HANDOFF
 
 u32 Renderer::_sort_chunks(u32* buffer) {
 	auto len = chunks.fill_index(buffer, CHUNK_MAX);

@@ -1,0 +1,98 @@
+#font
+name simple_font
+space 4
+height 10
+
+bitmap inline
+    #   0           1           2           3           4               5           6           7           8           9
+    . X X X .   . X X . .   . X X X .   . X X X .   X . . . X       X X X X X   . X X X .   X X X X X   . X X X .   . X X X .
+    X . . . X   . . X . .   X . . . X   X . . . X   X . . . X       X . . . .   X . . . X   . . . . X   X . . . X   X . . . X
+    X . . . X   . . X . .   . . . . X   . . . . X   X . . . X       X . . . .   X . . . .   . . . X .   X . . . X   X . . . X
+    X . X . X   . . X . .   . . X X .   . . X X .   X X X X X       X X X X .   X X X X .   . . . X .   . X X X .   . X X X X
+    X . . . X   . . X . .   . X . . .   . . . . X   . . . . X       . . . . X   X . . . X   . . X . .   X . . . X   . . . . X
+    X . . . X   . . X . .   X . . . .   X . . . X   . . . . X       X . . . X   X . . . X   . . X . .   X . . . X   X . . . X
+    . X X X .   X X X X X   X X X X X   . X X X .   . . . . X       . X X X .   . X X X .   . . X . .   . X X X .   . X X X .
+    #   A           B           C           D           E               F           G           H           I           J
+    . . X . .   X X X X .   . X X X .   X X X X .   X X X X X       X X X X X   . X X X .   X . . . X   X X X X X   . X X X X
+    . X . X .   X . . . X   X . . . X   X . . . X   X . . . .       X . . . .   X . . . X   X . . . X   . . X . .   . . . X .
+    X . . . X   X . . . X   X . . . .   X . . . X   X . . . .       X . . . .   X . . . .   X . . . X   . . X . .   . . . X .
+    X . . . X   X X X X .   X . . . .   X . . . X   X X X X .       X X X X .   X . X X X   X X X X X   . . X . .   . . . X .
+    X X X X X   X . . . X   X . . . .   X . . . X   X . . . .       X . . . .   X . . . X   X . . . X   . . X . .   . . . X .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . .       X . . . .   X . . . X   X . . . X   . . X . .   X . . X .
+    X . . . X   X X X X .   . X X X .   X X X X .   X X X X X       X . . . .   . X X X .   X . . . X   X X X X X   . X X . .
+    #   K           L           M           N           O               P           Q           R           S           T
+    X . . . X   X . . . .   X . . . X   X . . . X   . X X X .       X X X X .   . X X X .   X X X X .   . X X X .   X X X X X
+    X . . X .   X . . . .   X X . X X   X X . . X   X . . . X       X . . . X   X . . . X   X . . . X   X . . . X   . . X . .
+    X . X . .   X . . . .   X . X . X   X . X . X   X . . . X       X . . . X   X . . . X   X . . . X   X . . . .   . . X . .
+    X X . . .   X . . . .   X . . . X   X . X . X   X . . . X       X X X X .   X . . . X   X X X X .   . X X X .   . . X . .
+    X . X . .   X . . . .   X . . . X   X . X . X   X . . . X       X . . . .   X . X . X   X . . X .   . . . . X   . . X . .
+    X . . X .   X . . . .   X . . . X   X . . X X   X . . . X       X . . . .   X . . X .   X . . . X   X . . . X   . . X . .
+    X . . . X   X X X X X   X . . . X   X . . . X   . X X X .       X . . . .   . X X . X   X . . . X   . X X X .   . . X . .
+    #   U           V           W           X           Y               Z       . : ! , ;        #
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . . X . .   . X . . X .   X X X .   X X X X X
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       . . . . X   . X X . X   X X X X X X   . . . X   . . X . .
+    X . . . X   X . . . X   X . . . X   . X . X .   . X . X .       . . . X .   . . X . .   . X . . X .   . . . .   . . X . .
+    X . . . X   . X . X .   X . . . X   . . X . .   . . X . .       . . X . .   . . X . .   . X . . X .   X X X .   . . X . .
+    X . . . X   . X . X .   X . X . X   . X . X .   . . X . .       . X . . .   . . X . .   . X . . X .   . . . X   . . X . .
+    X . . . X   . . X . .   X X . X X   X . . . X   . . X . .       X . . . .   X X . . X   X X X X X X   . . . X   . . X . .
+    . X X X .   . . X . .   X . . . X   X . . . X   . . X . .       X X X X X   . . X . X   . X . . X .   X X X .   . . X . .
+    #   a           b           c           d           e               f           g           h       i    j
+    . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . . X X .   . X X X .   X . . . .   X . . X .   . . . . .
+    . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . X . . .   X . . . X   X . . . .   . . . . .   . . . . .
+    . X X X .   X X X X .   . X X X .   . X X X X   . X X X .       . X . . .   X . . . X   X X X X .   X . . X .   . . . . .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X . .   X . . . X   X . . . X   X . . X .   . . . . .
+    X . . . X   X . . . X   X . . . .   X . . . X   X X X X .       . X . . .   . X X X X   X . . . X   X . . X .   . . . . .
+    X . . X X   X . . . X   X . . . X   X . . . X   X . . . .       . X . . .   . . . . X   X . . . X   X . . X .   . . . . .
+    . X X . X   X X X X .   . X X X .   . X X X X   . X X X X       . X . . .   . X X X .   X . . . X   X . . X .   . . . . .
+    #   k           l           m           n           o               p           q           r           s           t
+    X . . . .   X . . . .   . . . . .   . . . . .   . . . . .       X X X X .   . X X X X   . . . . .   . . . X .   . X . . .
+    X . . . .   X . . . .   . . . . .   . . . . .   . . . . .       X . . . X   X . . . X   . . . . .   . X X . .   . X . . .
+    X . . X .   X . . . .   X X . X .   X X X . .   . X X X .       X . . . X   X . . . X   . X X X .   . X X X X   X X X . .
+    X . X . .   X . . . .   X . X . X   X . . X .   X . . . X       X . . . X   X . . . X   X . . . .   X . . . .   . X . . .
+    X X . . .   X . . . .   X . X . X   X . . X .   X . . . X       X X X X .   . X X X X   X . . . .   . X X X .   . X . . .
+    X . X . .   X . . . .   X . X . X   X . . X .   X . . . X       X . . . .   . . . . X   X . . . .   . . . . X   . X . . .
+    X . . X .   X . . . .   X . X . X   X . . X .   . X X X .       X . . . .   . . . . X   X . . . .   X X X X .   . . X . .
+    #   u           v           w           x           y               z
+    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . . . .   X X X X .   . . X . .   X X X X X
+    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   X . . . X   X . . . X   . X X X X   . . X . .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   X . . . X   X . . . X   X . . . .   . . X . .
+    X . . . X   X . . . X   X . . . X   . X . X .   X . . . X       . . . X .   X . . . X   X X X X .   . X X X .   . . X . .
+    X . . . X   X . . . X   X . X . X   . . X . .   . X X X X       . . X . .   X . X . X   X . . X .   . . . . X   . . X . .
+    X . . . X   . X . X .   X X . X X   . X . X .   . . . . X       . X . . .   X . . X .   X . . . X   X X X X .   . . X . .
+    . X X X .   . . X . .   X . . . X   X . . . X   . X X X .       X X X X X   . X X . X   X . . . X   . . X . .   . . X . .
+end
+
+array l_widths
+#   a  b  c  d  e    f  g  h  i  j
+    5, 5, 5, 5, 5,   4, 5, 5, 1, 4,
+#   k  l  m  n  o    p  q  r  s  t
+    4, 1, 5, 4, 5,   5, 5, 4, 5, 3,
+#   u  v  w  x  y    z
+    5, 5, 5, 5, 5,   5
+end
+
+glyphs
+    0-9: i * 5, 0, 5, 7, 6
+    A-Z: 5 * (i % 10), 7 * (1 + i // 10), 5, 7, 6
+    a-z: 5 * (i % 10), 7 * (4 + i // 10), l_widths[i], 7, l_widths[i] + 1, 0, (2 if c in '"gpqy"' else 0)
+     j : 41, 28, 3, 9, 4
+     s : 40, 37, 5, 5, 6, 0, 2
+    '!': 32, 21, 1, 7, 2
+    ':': 31, 21, 1, 6, 3, 0, 1
+    ';': 33, 21, 2, 8, 3, 0, 0
+    '.': 30, 26, 1, 1, 2, 0, 6
+    ',': 33, 26, 2, 3, 3, 0, 5
+    '#': 35, 21, 6, 7, 7
+    '$': 40, 42, 5, 7, 6
+    '_': 5, 6, 5, 1, 6, 0, 6
+    \\: 1, 2, 3, 4, 5
+end
+
+kerning
+    f : acdegmnopqrsuvwxyz : -1
+    JVYr : '._' : -1
+    JVYr : ','  : -2
+    FPTf : '._' : -2
+    FPTf : ','  : -3
+    BCDGOSUbcopuv : ',;' : -1
+end
