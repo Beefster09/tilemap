@@ -22,11 +22,11 @@ bitmap inline
     X . . . X   X X X X .   . X X X .   X X X X .   X X X X X       X . . . .   . X X X .   X . . . X   X X X X X   . X X . .
     #   K           L           M           N           O               P           Q           R           S           T
     X . . . X   X . . . .   X . . . X   X . . . X   . X X X .       X X X X .   . X X X .   X X X X .   . X X X .   X X X X X
-    X . . X .   X . . . .   X X . X X   X X . . X   X . . . X       X . . . X   X . . . X   X . . . X   X . . . X   . . X . .
-    X . X . .   X . . . .   X . X . X   X . X . X   X . . . X       X . . . X   X . . . X   X . . . X   X . . . .   . . X . .
+    X . . X .   X . . . .   X X . X X   X . . . X   X . . . X       X . . . X   X . . . X   X . . . X   X . . . X   . . X . .
+    X . X . .   X . . . .   X . X . X   X X . . X   X . . . X       X . . . X   X . . . X   X . . . X   X . . . .   . . X . .
     X X . . .   X . . . .   X . . . X   X . X . X   X . . . X       X X X X .   X . . . X   X X X X .   . X X X .   . . X . .
-    X . X . .   X . . . .   X . . . X   X . X . X   X . . . X       X . . . .   X . X . X   X . . X .   . . . . X   . . X . .
-    X . . X .   X . . . .   X . . . X   X . . X X   X . . . X       X . . . .   X . . X .   X . . . X   X . . . X   . . X . .
+    X . X . .   X . . . .   X . . . X   X . . X X   X . . . X       X . . . .   X . X . X   X . . X .   . . . . X   . . X . .
+    X . . X .   X . . . .   X . . . X   X . . . X   X . . . X       X . . . .   X . . X .   X . . . X   X . . . X   . . X . .
     X . . . X   X X X X X   X . . . X   X . . . X   . X X X .       X . . . .   . X X . X   X . . . X   . X X X .   . . X . .
     #   U           V           W           X           Y               Z       . : ! , ;        #
     X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . . X . .   . X . . X .   X X X .   X X X X X
@@ -66,11 +66,12 @@ array l_widths
 #   a  b  c  d  e    f  g  h  i  j
     5, 5, 5, 5, 5,   4, 5, 5, 1, 4,
 #   k  l  m  n  o    p  q  r  s  t
-    4, 1, 5, 4, 5,   5, 5, 4, 5, 3,
+    4, 1, 5, 4, 5,   5, 5, 3, 5, 3,
 #   u  v  w  x  y    z
     5, 5, 5, 5, 5,   5
 end
 
+cursor 0, 14, 1, 10, -1, -1
 glyphs
     0-9: i * 5, 0, 5, 7, 6
     A-Z: 5 * (i % 10), 7 * (1 + i // 10), 5, 7, 6
@@ -89,10 +90,12 @@ glyphs
 end
 
 kerning
-    f : acdegmnopqrsuvwxyz : -1
+    Jf : acdegmnopqrsuvwxyz : -1
+    T : acdegmnopqrsuvwxyz : -2
     JVYr : '._' : -1
     JVYr : ','  : -2
     FPTf : '._' : -2
     FPTf : ','  : -3
     BCDGOSUbcopuv : ',;' : -1
+    abcdefhiklmnoprstuvwxyz : j : -2
 end

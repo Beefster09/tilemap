@@ -6,11 +6,12 @@
 
 #include "renderer.h"
 #include "text.h"
+#include "textedit.h"
 
-//int screen_width = 1280;
-int screen_width = 512 * 3;
-//int screen_height = 720;
-int screen_height = 288 * 3;
+int virtual_width = 512;
+int virtual_height = 288;
+int screen_width = virtual_width * 3;
+int screen_height = virtual_height * 3;
 
 Tile simple_tilemap[] = {
 	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
@@ -24,6 +25,25 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	screen_height = height;
 	glViewport(0, 0, width, height);
 }
+
+bool console_active = true;
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	switch (key) {
+	case GLFW_KEY_RIGHT_SHIFT:
+	case GLFW_KEY_LEFT_SHIFT:
+	case GLFW_KEY_RIGHT_CONTROL:
+	case GLFW_KEY_LEFT_CONTROL:
+	case GLFW_KEY_RIGHT_ALT:
+	case GLFW_KEY_LEFT_ALT:
+	case GLFW_KEY_RIGHT_SUPER:
+	case GLFW_KEY_LEFT_SUPER:
+		return;
+	}
+	if (console_active && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+		console_type_key(key | (mods << GLFW_TO_CONSOLE_SHIFT));
+	}
+}
+
 constexpr float FPS_SMOOTHING = 0.9f;
 
 int main(int argc, char* argv[]) {
@@ -54,10 +74,12 @@ int main(int argc, char* argv[]) {
 	glViewport(0, 0, screen_width, screen_height);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
+	init_console();
+	glfwSetKeyCallback(window, key_callback);
+
 	{
 		init_simple_font();
-		Renderer renderer(window, 512, 288);
-		//Renderer renderer(window, 32, 32);
+		Renderer renderer(window, virtual_width, virtual_height);
 
 		auto tileset = load_tileset("assets/tileset24bit.png", 16);
 		TileChunk test_chunk(tileset, simple_tilemap, 4, 4);
@@ -84,6 +106,10 @@ int main(int argc, char* argv[]) {
 		float last_frame_time = glfwGetTime();
 		float frame_period = 0.016667f;
 
+		int r = 0xf, g = 0, b = 0;
+		bool show_fps = true;
+		bool f2_last_frame = false;
+
 		while(!glfwWindowShouldClose(window))
 		{
 			glfwPollEvents();
@@ -95,6 +121,22 @@ int main(int argc, char* argv[]) {
 			}
 			last_frame_time = time;
 			float fps = 1.f / frame_period;
+
+			if (r == 0xf) {
+				if (b > 0) b--;
+				else if (g == 0xf) r--;
+				else g++;
+			}
+			else if (g == 0xf) {
+				if (r > 0) r--;
+				else if (b == 0xf) g--;
+				else b++;
+			}
+			else if (b == 0xf) {
+				if (g > 0) g--;
+				else if (r == 0xf) b--;
+				else r++;
+			}
 
 			blah->x = 96 * sinf(time * TAU * 0.8) + blah_base_x;
 			blah->y = 52 * cosf(time * TAU * 1.2) + blah_base_y;
@@ -112,21 +154,23 @@ int main(int argc, char* argv[]) {
 				else {
 					renderer.set_sharpness(mouse_x / screen_width + base_sharp);
 				}
-				printf("Scaling sharpness: %.3f\n", renderer.get_sharpness());
 			}
 			else {
 				pressed = false;
-				for (int key = GLFW_KEY_0; key <= GLFW_KEY_9; key++) {
-					if(glfwGetKey(window, key)) {
-						renderer.set_sharpness((float) (key - GLFW_KEY_0) * 0.25);
-						printf("Scaling sharpness: %.3f\n", renderer.get_sharpness());
+				int f2_state;
+				if ((f2_state = glfwGetKey(window, GLFW_KEY_F2)) == GLFW_RELEASE) {
+					if (f2_last_frame == GLFW_PRESS) {
+						show_fps = !show_fps;
 					}
 				}
+				f2_last_frame = f2_state;
 			}
-			renderer.print_text(88, 74, "The quick brown fox\n#c[00FFFF]jumps#0 over the lazy dog.");
+			renderer.print_text(200, 1, "#c[7f1]Scaling sharpness: %.3f\n", renderer.get_sharpness());
+			renderer.print_text(88, 74, "The quick brown fox\n#c[%x%x%x]jumps#0 over the lazy dog.", r, g, b);
 			renderer.print_text(88, 100, "HOW\tVEXINGLY\tQUICK\nDAFT\tZEBRAS\tJUMP!\nLycanthrope: Werewolf.\nLVA\niji\nf_J,T.V,P.");
 			renderer.print_text(300, 20, "01234,56789_ABC;DEF.##$");
-			renderer.draw_frame(fps, true);
+			renderer.print_text(10, virtual_height - 20, "%s", get_console_line());
+			renderer.draw_frame(fps, show_fps);
 
 			logOpenGLErrors();
 

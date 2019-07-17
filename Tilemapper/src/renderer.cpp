@@ -424,8 +424,7 @@ bool Renderer::_print_text(Font* font, CoordinateSystem coords, float x, float y
 
 #define _HANDOFF(FONT, COORDS) {\
 	va_list args;\
-	int n_args;\
-	va_start(args, n_args);\
+	va_start(args, format);\
 	bool ret = _print_text((FONT), (COORDS), x, y, format, args);\
 	va_end(args);\
 	return ret;\
@@ -435,7 +434,6 @@ bool Renderer::print_text(Font* font, CoordinateSystem coords, float x, float y,
 bool Renderer::print_text(CoordinateSystem coords, float x, float y, const char* format, ...)             _HANDOFF(&simple_font, coords)
 bool Renderer::print_text(Font* font, float x, float y, const char* format, ...)                          _HANDOFF(font, SCREEN_SPACE)
 bool Renderer::print_text(float x, float y, const char* format, ...)                                      _HANDOFF(&simple_font, SCREEN_SPACE)
-
 #undef _HANDOFF
 
 u32 Renderer::_sort_chunks(u32* buffer) {

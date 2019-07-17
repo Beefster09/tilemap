@@ -26,7 +26,7 @@ def read_font(filename):
     bitmap = []
     glyphs = {}
     arrays = {}
-    kerning = []
+    kerning = {}
 
     eval_ctx = {'__builtins__': None}
 
@@ -64,7 +64,7 @@ def read_font(filename):
                 elif attr in ('glyphs', 'kerning'):
                     mode = attr
                 else:
-                    data[attr] = args[0]
+                    data[attr] = ' '.join(args)
 
             elif mode == 'bitmap':
                 if line.lower() == 'end':
@@ -115,7 +115,7 @@ def read_font(filename):
 
                 for a in first:
                     for b in second:
-                        kerning.append((ord(a), ord(b), int(offset)))
+                        kerning[ord(a), ord(b)] = int(offset)
 
             elif mode[0] == 'array':
                 if line.lower() == 'end':
@@ -123,7 +123,7 @@ def read_font(filename):
                     continue
 
                 arr = mode[1]
-                arrays[arr] += eval(f'[{line}]')
+                arrays[arr] += eval(f'[{line}]', eval_ctx)
 
     return {
         **data,
@@ -136,16 +136,6 @@ def output_c_header(font_data):
     name = font_data['name']
     glyphs = font_data['glyphs']
 
-    print(f'Font {name} = {{', file=out)
-    print( '  nullptr,', file=out)
-    print( '  {', file=out)
-    for ascii_glyph in range(0x21, 0x7f):
-        print(f"    {{ {', '.join(map(str, glyphs.get(chr(ascii_glyph), (0,) * 5)))} }},", file=out)
-    print( '  },', file=out)
-    print(f"  {font_data['space']},", file=out)
-    print(f"  {font_data['height']}", file=out)
-    print( '};\n', file=out)
-
     print(f"constexpr int {name}__bitmap_width = {len(font_data['bitmap'][0])};", file=out)
     print(f"constexpr int {name}__bitmap_height = {len(font_data['bitmap'])};", file=out)
     print(f'const unsigned char {name}__bitmap[] = {{', file=out)
@@ -153,10 +143,23 @@ def output_c_header(font_data):
         print(*row, sep=', ', end=',\n', file=out)
     print('};\n', file=out)
 
-    print(f'const int {name}__kerning[] = {{', file=out)
-    for pair in font_data['kerning']:
-        print(*pair, sep=', ', end=',\n', file=out)
-    print('};', file=out)
+    print(f'const KernPair {name}__kerning[] = {{', file=out)
+    for (a, b), offset in sorted(font_data['kerning'].items()):
+        if offset:
+            print(f"{{ {a}, {b}, {offset} }},", file=out)
+    print('};\n', file=out)
+
+    print(f'Font {name} = {{', file=out)
+    print( '  nullptr,', file=out)
+    print( '  {', file=out)
+    for ascii_glyph in range(0x21, 0x7f):
+        print(f"    {{ {', '.join(map(str, glyphs.get(chr(ascii_glyph), (0,) * 5)))} }},", file=out)
+    print( '  },', file=out)
+    print(f"  {{{font_data['cursor']}}},", file=out)
+    print(f"  {font_data['space']},", file=out)
+    print(f"  {font_data['height']},", file=out)
+    print(f"  {name}__kerning, {len(font_data['kerning'])}", file=out)
+    print( '};', file=out)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
