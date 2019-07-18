@@ -6,7 +6,7 @@
 
 #include "renderer.h"
 #include "text.h"
-#include "textedit.h"
+#include "console.h"
 
 int virtual_width = 512;
 int virtual_height = 288;
@@ -45,6 +45,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 constexpr float FPS_SMOOTHING = 0.9f;
+constexpr float CURSOR_BLINK_PERIOD = 1.f;
+constexpr float CURSOR_BLINK_DUTY_CYCLE = 0.6f * CURSOR_BLINK_PERIOD;
 
 int main(int argc, char* argv[]) {
 	glfwInit();
@@ -169,7 +171,7 @@ int main(int argc, char* argv[]) {
 			renderer.print_text(88, 74, "The quick brown fox\n#c[%x%x%x]jumps#0 over the lazy dog.", r, g, b);
 			renderer.print_text(88, 100, "HOW\tVEXINGLY\tQUICK\nDAFT\tZEBRAS\tJUMP!\nLycanthrope: Werewolf.\nLVA\niji\nf_J,T.V,P.");
 			renderer.print_text(300, 20, "01234,56789_ABC;DEF.##$");
-			renderer.print_text(10, virtual_height - 20, "%s", get_console_line());
+			renderer.print_text(10, virtual_height - 20, "%s", get_console_line(fmod(time, CURSOR_BLINK_PERIOD) < CURSOR_BLINK_DUTY_CYCLE) );
 			renderer.draw_frame(fps, show_fps);
 
 			logOpenGLErrors();

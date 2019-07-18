@@ -9,7 +9,8 @@
 constexpr int ASCII_START = 33;
 constexpr int TAB_LENGTH = 8; // Number of spaces that make up a tab
 
-static u32 cursor_color = 0xeeeeeeff;
+// #console
+static u32 cursor_color = 0xccccccff;
 
 static inline u32 double_nybbles(u32 x) {
 	// expand ABCD into _A_B_C_D, shift & combine

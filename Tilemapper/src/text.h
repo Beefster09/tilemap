@@ -31,10 +31,10 @@ struct Font {
 	} cursor;
 	const i32 space_width;
 	const i32 line_height;
-	// std::unordered_map<u32, GlyphData> other_glyphs;
-	// TODO: replace with something that doesn't add elements on a failed lookup.
 	const KernPair* kern_pairs;
 	const size_t n_kern_pairs;
+
+	// std::unordered_map<u32, GlyphData> other_glyphs;
 
 	int print(GlyphRenderData* const buffer, size_t buf_size, const char* text, float x, float y) const;
 };
