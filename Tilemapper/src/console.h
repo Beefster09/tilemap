@@ -1,6 +1,6 @@
 #pragma once
 
-#define GLFW_TO_CONSOLE_SHIFT 20
+#define GLFW_TO_CONSOLE_SHIFT 24
 
 void init_console();
 int console_type_key(int keycode);

@@ -28,14 +28,14 @@ bitmap inline
     X . X . .   X . . . .   X . . . X   X . . X X   X . . . X       X . . . .   X . X . X   X . . X .   . . . . X   . . X . .
     X . . X .   X . . . .   X . . . X   X . . . X   X . . . X       X . . . .   X . . X .   X . . . X   X . . . X   . . X . .
     X . . . X   X X X X X   X . . . X   X . . . X   . X X X .       X . . . .   . X X . X   X . . . X   . X X X .   . . X . .
-    #   U           V           W           X           Y               Z       . : ! , ;        #
-    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . . X . .   . X . . X .   X X X .   X X X X X
-    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       . . . . X   . X X . X   X X X X X X   . . . X   . . X . .
-    X . . . X   X . . . X   X . . . X   . X . X .   . X . X .       . . . X .   . . X . .   . X . . X .   . . . .   . . X . .
-    X . . . X   . X . X .   X . . . X   . . X . .   . . X . .       . . X . .   . . X . .   . X . . X .   X X X .   . . X . .
-    X . . . X   . X . X .   X . X . X   . X . X .   . . X . .       . X . . .   . . X . .   . X . . X .   . . . X   . . X . .
-    X . . . X   . . X . .   X X . X X   X . . . X   . . X . .       X . . . .   X X . . X   X X X X X X   . . . X   . . X . .
-    . X X X .   . . X . .   X . . . X   X . . . X   . . X . .       X X X X X   . . X . X   . X . . X .   X X X .   . . X . .
+    #   U           V           W           X           Y               Z       . : ! , ;        #           =          ?
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . . X . .   . X . . X .   X X X X   . X X X .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       . . . . X   . X X . X   X X X X X X   . . . .   X . . . X
+    X . . . X   X . . . X   X . . . X   . X . X .   . X . X .       . . . X .   . . X . .   . X . . X .   . . . .   . . . . X
+    X . . . X   . X . X .   X . . . X   . . X . .   . . X . .       . . X . .   . . X . .   . X . . X .   X X X X   . . X X .
+    X . . . X   . X . X .   X . X . X   . X . X .   . . X . .       . X . . .   . . X . .   . X . . X .   . . . .   . . X . .
+    X . . . X   . . X . .   X X . X X   X . . . X   . . X . .       X . . . .   X X . . X   X X X X X X   . . . .   . . . . .
+    . X X X .   . . X . .   X . . . X   X . . . X   . . X . .       X X X X X   . . X . X   . X . . X .   . . . .   . . X . .
     #   a           b           c           d           e               f           g           h       i    j
     . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . . X X .   . X X X .   X . . . .   X . . X .   . . . . .
     . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . X . . .   X . . . X   X . . . .   . . . . .   . . . . .
@@ -52,14 +52,14 @@ bitmap inline
     X X . . .   X . . . .   X . X . X   X . . X .   X . . . X       X X X X .   . X X X X   X . . . .   . X X X .   . X . . .
     X . X . .   X . . . .   X . X . X   X . . X .   X . . . X       X . . . .   . . . . X   X . . . .   . . . . X   . X . . .
     X . . X .   X . . . .   X . X . X   X . . X .   . X X X .       X . . . .   . . . . X   X . . . .   X X X X .   . X . . .
-    #   u           v           w           x           y               z
-    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . . . .   X X X X .   . . X . .   X X X X X
-    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   X . . . X   X . . . X   . X X X X   . . X . .
-    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   X . . . X   X . . . X   X . . . .   . . X . .
-    X . . . X   X . . . X   X . . . X   . X . X .   X . . . X       . . . X .   X . . . X   X X X X .   . X X X .   . . X . .
-    X . . . X   X . . . X   X . X . X   . . X . .   . X X X X       . . X . .   X . X . X   X . . X .   . . . . X   . . X . .
-    X . . . X   . X . X .   X X . X X   . X . X .   . . . . X       . X . . .   X . . X .   X . . . X   X X X X .   . . X . .
-    . X X X .   . . X . .   X . . . X   X . . . X   . X X X .       X X X X X   . X X . X   X . . . X   . . X . .   . . X . .
+    #   u           v           w           x           y               z         /   \
+    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . X . .   X X X X .   . . X . .   X X X X X
+    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . X . .   X . . . X   . X X X X   . . X . .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . X . X .   X . . . X   X . . . .   . . X . .
+    X . . . X   X . . . X   X . . . X   . X . X .   X . . . X       . . . X .   . X . X .   X X X X .   . X X X .   . . X . .
+    X . . . X   X . . . X   X . X . X   . . X . .   . X X X X       . . X . .   . X . X .   X . . X .   . . . . X   . . X . .
+    X . . . X   . X . X .   X X . X X   . X . X .   . . . . X       . X . . .   X . . . X   X . . . X   X X X X .   . . X . .
+    . X X X .   . . X . .   X . . . X   X . . . X   . X X X .       X X X X X   X . . . X   X . . . X   . . X . .   . . X . .
     # Placeholder
     . . . X . . .
     . . X X X . .
@@ -79,7 +79,7 @@ array l_widths
     5, 5, 5, 5, 5,   5
 end
 
-cursor 0, 14, 1, 10, -1, -1
+cursor      0, 14, 1, 10, -1, -1
 placeholder 0, 49, 7, 7, 8
 glyphs
     0-9: i * 5, 0, 5, 7, 6
@@ -93,14 +93,18 @@ glyphs
     '.': 30, 26, 1, 1, 2, 0, 6
     ',': 33, 26, 2, 3, 3, 0, 5
     '#': 35, 21, 6, 7, 7
-    '$': 40, 42, 5, 7, 6
     '_': 5, 6, 5, 1, 6, 0, 6
-    \\: 1, 2, 3, 4, 5
+    '=': 41, 21, 4, 4, 5, 0, 2
+    '?': 45, 21, 5, 7, 6
+    '$': 40, 42, 5, 7, 6
+    '/': 30, 42, 3, 7, 4
+    '\': 32, 42, 3, 7, 4
 end
 
 kerning
     Jf : acdegmnopqrsuvwxyz : -1
     T : acdegmnopqrsuvwxyz : -2
+    f : ';' : -1
     JVYr : '._' : -1
     JVYr : ','  : -2
     FPTf : '._' : -2

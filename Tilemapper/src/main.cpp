@@ -46,7 +46,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 constexpr float FPS_SMOOTHING = 0.9f;
 constexpr float CURSOR_BLINK_PERIOD = 1.f;
-constexpr float CURSOR_BLINK_DUTY_CYCLE = 0.6f * CURSOR_BLINK_PERIOD;
+constexpr float CURSOR_BLINK_DUTY_CYCLE = 0.5f * CURSOR_BLINK_PERIOD;
+
+extern float scaling_sharpness;
 
 int main(int argc, char* argv[]) {
 	glfwInit();
@@ -103,7 +105,6 @@ int main(int argc, char* argv[]) {
 
 		logOpenGLErrors();
 
-		float base_sharp = renderer.get_sharpness();
 		bool pressed = false;
 		float last_frame_time = glfwGetTime();
 		float frame_period = 0.016667f;
@@ -146,28 +147,15 @@ int main(int argc, char* argv[]) {
 			meh->attrs.x = 120 * sinf(time * TAU * 0.3) + meh_base_x;
 			meh->attrs.y = 12 * cosf(time * TAU * 0.5) + meh_base_y;
 
-			if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1)) {
-				double mouse_x, mouse_y;
-				glfwGetCursorPos(window, &mouse_x, &mouse_y);
-				if (!pressed) {
-					base_sharp = renderer.get_sharpness() - mouse_x / screen_width;
-					pressed = true;
-				}
-				else {
-					renderer.set_sharpness(mouse_x / screen_width + base_sharp);
+			int f2_state = glfwGetKey(window, GLFW_KEY_F2);
+			if (f2_state == GLFW_RELEASE) {
+				if (f2_last_frame == GLFW_PRESS) {
+					show_fps = !show_fps;
 				}
 			}
-			else {
-				pressed = false;
-				int f2_state;
-				if ((f2_state = glfwGetKey(window, GLFW_KEY_F2)) == GLFW_RELEASE) {
-					if (f2_last_frame == GLFW_PRESS) {
-						show_fps = !show_fps;
-					}
-				}
-				f2_last_frame = f2_state;
-			}
-			renderer.print_text(200, 1, "#c[7f1]Scaling sharpness: %.3f\n", renderer.get_sharpness());
+			f2_last_frame = f2_state;
+
+			renderer.print_text(200, 1, "#c[7f1]Scaling sharpness: %.3f\n", scaling_sharpness);
 			renderer.print_text(88, 74, "The quick brown fox\n#c[%x%x%x]jumps#0 over the lazy dog.", r, g, b);
 			renderer.print_text(88, 100, "HOW\tVEXINGLY\tQUICK\nDAFT\tZEBRAS\tJUMP!\nLycanthrope: Werewolf.\nLVA\niji\nf_J,T.V,P.");
 			renderer.print_text(300, 20, "01234,56789_ABC;DEF.##$");
@@ -179,6 +167,8 @@ int main(int argc, char* argv[]) {
 			if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
 				glfwSetWindowShouldClose(window, true);
 			}
+
+			temp_storage_clear();
 		}
 	}
 

@@ -8,7 +8,7 @@ PIXEL_ALIAS = {'X': 255, 'o': 127}
 OPENGL_MIN_TEX_SIZE = 64
 
 def split_unquoted(line, max_split):
-    lexer = shlex.shlex(line, posix=True)
+    lexer = shlex.shlex(line, posix=True) # TEMP: this handles some cases weirdly
     lexer.whitespace = ':'
     lexer.whitespace_split = True
     lexer.punctuation_chars = ''
@@ -21,7 +21,9 @@ def split_unquoted(line, max_split):
             result.append(token)
 
 def read_font(filename):
-    data = {}
+    data = {
+        'placeholder': (0, 0, 0, 0, 0)
+    }
     mode = None
     bitmap = []
     glyphs = {}
@@ -63,6 +65,8 @@ def read_font(filename):
                     arrays[args[0]] = []
                 elif attr in ('glyphs', 'kerning'):
                     mode = attr
+                elif attr in ('placeholder', 'cursor'):
+                    data[attr] = eval(' '.join(args), eval_ctx)
                 else:
                     data[attr] = ' '.join(args)
 
@@ -125,6 +129,9 @@ def read_font(filename):
                 arr = mode[1]
                 arrays[arr] += eval(f'[{line}]', eval_ctx)
 
+    placeholder = data['placeholder']
+    for ascii_glyph in range(0x21, 0x7f):
+        glyphs.setdefault(chr(ascii_glyph), placeholder)
     return {
         **data,
         'bitmap': bitmap,
@@ -153,9 +160,10 @@ def output_c_header(font_data):
     print( '  nullptr,', file=out)
     print( '  {', file=out)
     for ascii_glyph in range(0x21, 0x7f):
-        print(f"    {{ {', '.join(map(str, glyphs.get(chr(ascii_glyph), (0,) * 5)))} }},", file=out)
+        c = chr(ascii_glyph)
+        print(f"  /* {c} */ {{ {', '.join(map(str, glyphs.get(c, (0,) * 5)))} }},", file=out)
     print( '  },', file=out)
-    print(f"  {{{font_data['cursor']}}},", file=out)
+    print(f"  {{ {', '.join(map(str, font_data['cursor']))} }},", file=out)
     print(f"  {font_data['space']},", file=out)
     print(f"  {font_data['height']},", file=out)
     print(f"  {name}__kerning, {len(font_data['kerning'])}", file=out)
@@ -184,4 +192,10 @@ if __name__ == '__main__':
 
     font_data = read_font(args.file)
     if args.format == 'c_header':
-        output_c_header(font_data)
+        try:
+            output_c_header(font_data)
+        except Exception:
+            if out is not sys.stdout:
+                out.close()
+                os.remove(args.outfile)
+            raise

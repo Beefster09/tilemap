@@ -9,55 +9,25 @@
 constexpr int ASCII_START = 33;
 constexpr int TAB_LENGTH = 8; // Number of spaces that make up a tab
 
-// #console
-static u32 cursor_color = 0xccccccff;
+// @console
+HexColor cursor_color = 0xccccccff;
 
-static inline u32 double_nybbles(u32 x) {
-	// expand ABCD into _A_B_C_D, shift & combine
-	u32 r =  x & 0x000F;
-	r    |= (x & 0x00F0) << 4;
-	r    |= (x & 0x0F00) << 8;
-	r    |= (x & 0xF000) << 12;
-	return r | (r << 4);
-}
-
-static bool handle_color_code(const char* const fulltext, const char* const c, u32* color, const char** end) {
+static inline bool handle_color_code(const char* const fulltext, const char* const c, HexColor* color, const char** end) {
 	*end = strchr(c, ']');
 	if (!*end) {
-		fprintf(stderr, "TEXT ERROR: Set Color Control Code is not followed with ']'.\n  From: \"%s\"\n", fulltext);
+		ERR_LOG("TEXT ERROR: Set Color Control Code is not followed with ']'.\n  From: \"%s\"\n", fulltext);
 		return false;
 	}
-	auto count = (u32)(*end - c);
-	for (int i = 0; i < count; i++) {
-		if (!(c[i] >= '0' && c[i] <= '9'
-			|| c[i] >= 'A' && c[i] <= 'F'
-			|| c[i] >= 'a' && c[i] <= 'f')) {
-			fprintf(stderr, "TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"\n", fulltext);
-			return false;
-		}
-	}
-	if (count == 0) {
-		*color = 0xFFFFFFFF;
-		return true;
-	}
-	*color = strtoul(c, nullptr, 16);
-	switch (count) {
-	case 3:  // RGB
-		*color = double_nybbles(*color);
-	// drop-thru intentional
-	case 6:  // RRGGBB
-		*color <<= 8;
-		*color |= 0xff;
-		return true;
-	
-	case 4:  // RGBA
-		*color = double_nybbles(*color);
-	// drop-thru intentional
-	case 8:  // RRGGBBAA
-		return true;
-	
+	switch (parse_hex_color(c, nullptr, color)) {
+	case HEX_COLOR_OK: return true;
+	case HEX_COLOR_INVALID_CHARS:
+		ERR_LOG("TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"\n", fulltext);
+		return false;
+	case HEX_COLOR_INVALID_LEN:
+		ERR_LOG("TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"\n", fulltext);
+		return false;
 	default:
-		fprintf(stderr, "TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"\n", fulltext);
+		ERR_LOG("Unkown Color Control Parse Error in \"%s\".", fulltext);
 		return false;
 	}
 }
@@ -201,4 +171,6 @@ void init_simple_font() {
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	simple_font.glyph_atlas = new Texture(tex_handle, GL_TEXTURE_RECTANGLE);
+
+	// do a thing
 }

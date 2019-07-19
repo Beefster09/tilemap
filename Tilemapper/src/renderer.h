@@ -98,7 +98,6 @@ private:
 	GlyphPrintData* print_later_ss;
 
 	glm::mat4 world_camera, ui_camera;
-	float scaling_sharpness = 2.f;
 
 	char* temp_string_storage;
 	char* string_storage_next;
@@ -110,14 +109,6 @@ private:
 public:
 	Renderer(GLFWwindow* window, int width, int height);
 	void draw_frame(float fps, bool show_fps);
-
-
-	inline void set_sharpness(float sharpness) {
-		scaling_sharpness = max(sharpness, 0.f);
-	}
-	inline float get_sharpness() {
-		return scaling_sharpness;
-	}
 
 	ChunkID add_chunk(const TileChunk* const chunk, float x, float y, i32 layer);
 	bool remove_chunk(const ChunkID id);

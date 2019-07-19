@@ -33,6 +33,11 @@ const float tile_vertices[] = {
 extern int screen_width, screen_height;
 extern Font simple_font;
 
+// Global Renderer State
+
+// @console name=sharpness
+float scaling_sharpness = 2.f;
+
 #ifdef NO_EMBED_SHADERS
 
 #define COMPILE_SHADER(V, F) compileShaderFromFiles((V), (F))

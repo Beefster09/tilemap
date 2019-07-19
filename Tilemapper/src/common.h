@@ -1,6 +1,24 @@
 #pragma once
 
-#include <glfw3.h>
+#include <cstdint>
+#include <cmath>
+
+typedef int8_t i8;
+typedef uint8_t u8;
+typedef int16_t i16;
+typedef uint16_t u16;
+typedef int32_t i32;
+typedef uint32_t u32;
+typedef int64_t i64;
+typedef uint64_t u64;
+typedef float f32;
+typedef double f64;
+typedef u32 HexColor;
+
+enum HexColorParseStatusCode {
+	HEX_COLOR_OK, HEX_COLOR_INVALID_LEN, HEX_COLOR_INVALID_CHARS
+};
+HexColorParseStatusCode parse_hex_color(const char* str, const char** end, HexColor* color);
 
 char* readFile(const char* filename);
 
@@ -10,7 +28,7 @@ constexpr float TAU = (float)(3.141592653589793238 * 2.0);
 int _logOpenGLErrors(const char* caller, const char* file, int lineNo);
 
 #ifdef NDEBUG
-#define logOpenGLErrors()
+#define logOpenGLErrors() do{}while(0)
 #else
 #define logOpenGLErrors() _logOpenGLErrors(__func__, __FILE__, __LINE__)
 #endif
@@ -41,16 +59,27 @@ inline T clamp(T a, T lo = 0, T hi = 1) {
 	return a;
 }
 
-const char* glEnumName(GLenum type);
-const char* glslTypeName(GLenum type);
+#ifdef _MSC_VER
+#define PATH_SEP '\\'
+#else
+#define PATH_SEP '/'
+#endif
+#define _STRINGIFY(S) #S
+#define __FILE_BASENAME__ strrchr(__FILE__, PATH_SEP)
+#ifdef NDEBUG
+#define ERR_LOG(FMT, ...) do{}while(0)
+#else
+#define ERR_LOG(FMT, ...) fprintf(stderr, "[%s (line " _STRINGIFY(__LINE__) " in %s)] " FMT, __func__, __FILE_BASENAME__, __VA_ARGS__)
+#endif
 
-typedef int8_t i8;
-typedef uint8_t u8;
-typedef int16_t i16;
-typedef uint16_t u16;
-typedef int32_t i32;
-typedef uint32_t u32;
-typedef int64_t i64;
-typedef uint64_t u64;
-typedef float f32;
-typedef double f64;
+/// Allocate some bytes from temp storage
+void* _temp_alloc(size_t n_bytes);
+
+/// Allocate and zero from temp storage
+void* _temp_alloc0(size_t n_bytes);
+
+/// This should be run at the end of every frame in each thread that uses temp storage
+void temp_storage_clear();
+
+#define temp_alloc(TYPE, N) ((TYPE*) _temp_alloc(sizeof(TYPE) * N))
+#define temp_alloc0(TYPE, N) ((TYPE*) _temp_alloc0(sizeof(TYPE) * N))

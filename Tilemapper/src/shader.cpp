@@ -98,6 +98,8 @@ Shader::Shader(GLuint shaderID, const char* vert_src, const char* frag_src) {
 #endif
 }
 
+const char* glslTypeName(GLenum type); // in common.cpp
+
 void Shader::printFullInterface() {
 	GLint numSlots;
 	glGetProgramiv(shaderProgram, GL_ACTIVE_UNIFORMS, &numSlots);
