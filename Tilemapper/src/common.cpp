@@ -106,7 +106,7 @@ static inline u32 double_nybbles(u32 x) {
 	return r | (r << 4);
 }
 
-HexColorParseStatusCode parse_hex_color(const char* str, const char** end, HexColor* color) {
+StatusCode parse_hex_color(const char* str, const char** end, HexColor* color) {
 	const char* local_end = nullptr;
 	if (end == nullptr) {
 		end = &local_end;
@@ -114,14 +114,14 @@ HexColorParseStatusCode parse_hex_color(const char* str, const char** end, HexCo
 	errno = 0;
 	HexColor maybe_color = strtoul(str, const_cast<char**>(end), 16);
 	if (errno == ERANGE) {
-		return HEX_COLOR_INVALID_LEN;
+		return INVALID_LEN;
 	}
 	auto count = (*end - str);
 	for (int i = 0; i < count; i++) {
 		if (!(str[i] >= '0' && str[i] <= '9'
 			|| str[i] >= 'A' && str[i] <= 'F'
 			|| str[i] >= 'a' && str[i] <= 'f')) {
-			return HEX_COLOR_INVALID_CHARS;
+			return INVALID_CHARS;
 		}
 	}
 	switch (count) {
@@ -129,20 +129,35 @@ HexColorParseStatusCode parse_hex_color(const char* str, const char** end, HexCo
 		*color = double_nybbles(maybe_color);
 		*color <<= 8;
 		*color |= 0xff;
-		return HEX_COLOR_OK;
+		return OK;
 	case 6:  // RRGGBB
 		*color = (maybe_color << 8) | 0xff;
-		return HEX_COLOR_OK;
+		return OK;
 
 	case 4:  // RGBA
 		*color = double_nybbles(maybe_color);
-		return HEX_COLOR_OK;
+		return OK;
 	case 8:  // RRGGBBAA
 		*color = maybe_color;
-		return HEX_COLOR_OK;
+		return OK;
 
 	default:
-		return HEX_COLOR_INVALID_LEN;
+		return INVALID_LEN;
+	}
+}
+
+StatusCode parse_bool(const char* str, const char** end, bool* out) {
+	// TEMP
+	if (strcmp(str, "true") == 0) {
+		*out = true;
+		return OK;
+	}
+	else if (strcmp(str, "false") == 0) {
+		*out = false;
+		return OK;
+	}
+	else {
+		return INVALID_FORMAT;
 	}
 }
 

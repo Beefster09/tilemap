@@ -8,10 +8,24 @@
 #include "text.h"
 #include "console.h"
 
-int virtual_width = 512;
-int virtual_height = 288;
+constexpr int virtual_width = 512;
+constexpr int virtual_height = 288;
 int screen_width = virtual_width * 3;
 int screen_height = virtual_height * 3;
+
+// @console
+bool show_fps = true;
+
+// @console
+void test_func(int i, float f = 5) {
+	printf("test_func with %d, %f\n", i, f);
+} //nope
+
+constexpr float FPS_SMOOTHING = 0.9f;
+constexpr float CURSOR_BLINK_PERIOD = 1.f;
+constexpr float CURSOR_BLINK_DUTY_CYCLE = 0.5f * CURSOR_BLINK_PERIOD;
+
+extern float scaling_sharpness;
 
 Tile simple_tilemap[] = {
 	2,       0, 2|HFLIP,       0, 2|DFLIP,       0, 2|HFLIP|DFLIP, 0,
@@ -26,7 +40,28 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
-bool console_active = true;
+static bool console_active = true;
+static bool is_fullscreen = false;
+
+void toggle_fullscreen(GLFWwindow* window) {
+	static int windowed_width = virtual_width;
+	static int windowed_height = virtual_height;
+	static int windowed_x = 64;
+	static int windowed_y = 64;
+
+	if (glfwGetWindowMonitor(window)) { // switch from fullscreen
+		glfwSetWindowMonitor(window, nullptr, windowed_x, windowed_y, windowed_width, windowed_height, GLFW_DONT_CARE);
+	}
+	else { // switch to fullscreen
+		auto monitor = glfwGetPrimaryMonitor();
+		auto mode = glfwGetVideoMode(monitor);
+		windowed_height = screen_height;
+		windowed_width = screen_width;
+		glfwGetWindowPos(window, &windowed_x, &windowed_y);
+		glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+	}
+}
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	switch (key) {
 	case GLFW_KEY_RIGHT_SHIFT:
@@ -38,22 +73,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	case GLFW_KEY_RIGHT_SUPER:
 	case GLFW_KEY_LEFT_SUPER:
 		return;
+	case GLFW_KEY_F2:
+		if (action == GLFW_RELEASE) show_fps = !show_fps;
+		return;
+	case GLFW_KEY_F10: {
+		if (action == GLFW_RELEASE) toggle_fullscreen(window);
+		return;
 	}
-	if (console_active && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-		console_type_key(key | (mods << GLFW_TO_CONSOLE_SHIFT));
+	default:
+		if (console_active && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+			console_type_key(key | (mods << GLFW_TO_CONSOLE_SHIFT));
+		}
 	}
 }
-
-// @console
-void test_func(int i, float f = 5) {
-	printf("test_func with %d, %f\n", i, f);
-} //nope
-
-constexpr float FPS_SMOOTHING = 0.9f;
-constexpr float CURSOR_BLINK_PERIOD = 1.f;
-constexpr float CURSOR_BLINK_DUTY_CYCLE = 0.5f * CURSOR_BLINK_PERIOD;
-
-extern float scaling_sharpness;
 
 int main(int argc, char* argv[]) {
 	glfwInit();
@@ -64,8 +96,8 @@ int main(int argc, char* argv[]) {
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "Tilemapper", NULL, NULL);
-	if (window == NULL) {
+	GLFWwindow* window = glfwCreateWindow(screen_width, screen_height, "Tilemapper", nullptr, nullptr);
+	if (window == nullptr) {
 		printf("Failed to create GLFW window.\n");
 		glfwTerminate();
 		getchar();
@@ -115,8 +147,6 @@ int main(int argc, char* argv[]) {
 		float frame_period = 0.016667f;
 
 		int r = 0xf, g = 0, b = 0;
-		bool show_fps = true;
-		bool f2_last_frame = false;
 
 		while(!glfwWindowShouldClose(window))
 		{
@@ -151,14 +181,6 @@ int main(int argc, char* argv[]) {
 
 			meh->attrs.x = 120 * sinf(time * TAU * 0.3) + meh_base_x;
 			meh->attrs.y = 12 * cosf(time * TAU * 0.5) + meh_base_y;
-
-			int f2_state = glfwGetKey(window, GLFW_KEY_F2);
-			if (f2_state == GLFW_RELEASE) {
-				if (f2_last_frame == GLFW_PRESS) {
-					show_fps = !show_fps;
-				}
-			}
-			f2_last_frame = f2_state;
 
 			renderer.print_text(200, 1, "#c[7f1]Scaling sharpness: %.3f\n", scaling_sharpness);
 			renderer.print_text(88, 74, "The quick brown fox\n#c[%x%x%x]jumps#0 over the lazy dog.", r, g, b);

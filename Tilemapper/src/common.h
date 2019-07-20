@@ -15,10 +15,15 @@ typedef float f32;
 typedef double f64;
 typedef u32 HexColor;
 
-enum HexColorParseStatusCode {
-	HEX_COLOR_OK, HEX_COLOR_INVALID_LEN, HEX_COLOR_INVALID_CHARS
+enum StatusCode {
+	OK = 0,
+	INVALID_CHARS,
+	INVALID_LEN,
+	INVALID_FORMAT,
 };
-HexColorParseStatusCode parse_hex_color(const char* str, const char** end, HexColor* color);
+
+StatusCode parse_hex_color(const char* str, const char** end, HexColor* color);
+StatusCode parse_bool(const char* str, const char** end, bool* out);
 
 char* readFile(const char* filename);
 

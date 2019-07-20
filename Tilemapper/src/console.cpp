@@ -112,6 +112,7 @@ enum ConsoleDataType {
 	T_VOID = 0,
 	T_INT = 1,
 	T_FLOAT,
+	T_BOOL,
 	T_STRING,
 	T_HEX_COLOR,
 };
@@ -255,11 +256,11 @@ static CommandStatus set_variable(const char* var_name, const char* str_value) {
 	case T_HEX_COLOR: {
 		HexColor color;
 		switch (parse_hex_color(str_value, nullptr, &color)) {
-		case HEX_COLOR_OK:
+		case OK:
 			*((HexColor*)var->ptr) = color;
 			return CMD_OK;
-		case HEX_COLOR_INVALID_CHARS: return CMD_TYPE_MISMATCH;
-		case HEX_COLOR_INVALID_LEN: return CMD_FORMAT_ERROR;
+		case INVALID_CHARS: return CMD_TYPE_MISMATCH;
+		case INVALID_LEN: return CMD_FORMAT_ERROR;
 		default: return CMD_TYPE_MISMATCH;
 		}
 	}
@@ -279,6 +280,15 @@ static CommandStatus set_variable(const char* var_name, const char* str_value) {
 			return CMD_OK;
 		}
 		else return CMD_TYPE_MISMATCH;
+	}
+	case T_BOOL: {
+		bool value;
+		switch(parse_bool(str_value, nullptr, &value)) {
+		case OK:
+			*((bool*)var->ptr) = value;
+			return CMD_OK;
+		default: return CMD_TYPE_MISMATCH;
+		}
 	}
 	default: return CMD_FAILURE;
 	}
@@ -343,11 +353,11 @@ static CommandStatus console_submit_command() {
 			case T_HEX_COLOR: {
 				HexColor color;
 				switch (parse_hex_color(val, nullptr, &color)) {
-				case HEX_COLOR_OK:
+				case OK:
 					args[actual_arg].v_hex_color = color;
 					break;
-				case HEX_COLOR_INVALID_CHARS: return CMD_TYPE_MISMATCH;
-				case HEX_COLOR_INVALID_LEN: return CMD_FORMAT_ERROR;
+				case INVALID_CHARS: return CMD_TYPE_MISMATCH;
+				case INVALID_LEN: return CMD_FORMAT_ERROR;
 				default: return CMD_TYPE_MISMATCH;
 				}
 			}
@@ -428,6 +438,7 @@ void init_console() {
 int console_type_key(int keycode) {
 	if (keycode == GLFW_KEY_ENTER) {
 		auto status = console_submit_command();
+		// TODO: print some sort of response in a command history
 		console_history.push_back(console_line);
 		history_pos = 0;
 		console_line.clear();

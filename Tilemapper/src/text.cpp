@@ -19,11 +19,11 @@ static inline bool handle_color_code(const char* const fulltext, const char* con
 		return false;
 	}
 	switch (parse_hex_color(c, nullptr, color)) {
-	case HEX_COLOR_OK: return true;
-	case HEX_COLOR_INVALID_CHARS:
+	case OK: return true;
+	case INVALID_CHARS:
 		ERR_LOG("TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"\n", fulltext);
 		return false;
-	case HEX_COLOR_INVALID_LEN:
+	case INVALID_LEN:
 		ERR_LOG("TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"\n", fulltext);
 		return false;
 	default:
