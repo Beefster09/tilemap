@@ -15,35 +15,72 @@ class IncompatibleDeclaration(Exception):
         return f"Incompatible Declaration: '{' '.join(self.args[0])}'"
 
 Var = namedtuple('Var', ['realname', 'name', 'type'])
-Param = namedtuple('Param', ['name', 'type'])
-Func = namedtuple('Func', ['realname', 'name', 'ret_type', 'args'])
-
-def _iter_read(iterator):
-    return lambda x=-1: next(iterator).encode('utf-8')
-
-def c_format(vartype):
-    return ' '.join(vartype)
+Param = namedtuple('Param', ['name', 'type', 'default'])
+Func = namedtuple('Func', ['realname', 'name', 'ret_type', 'params'])
 
 TYPES = {
     'HexColor': 'hex_color',
     'i32': 'int',
-    'u32': 'int',
-    'int': 'int',
     'int32_t': 'int',
-    'uint32_t': 'int',
-    'float': 'float',
+    'u32': 'uint',
+    'uint32_t': 'uint',
     'f32': 'float',
     ('char', '*'): 'string',
 }
 
+BLOCK_COMMENT = re.compile(r'/\*.*?\*/')
+LINE_COMMENT = re.compile(r'//.*')
+
+def _iter_read(iterator):
+    def _readline(n_bytes=-1):
+        line = next(iterator)
+        # strip comments
+        line = LINE_COMMENT.sub('', line)
+        line = BLOCK_COMMENT.sub('', line)
+        line = line.replace('::', '.')
+        return line.encode('utf-8')
+    return _readline
+
+def c_format(vartype):
+    return ' '.join(vartype)
+
 def enumtype(vartype):
+    stripped = tuple([
+        token for token in vartype
+        if token not in ('&', 'const')
+    ])
     if len(vartype) == 1:
         vartype = vartype[0]
-    return TYPES[vartype].upper()
+    return TYPES.get(vartype, vartype).replace(' ', '_').upper()
+
+def parse_param(p):
+    tok_list = []
+    name = None
+    ptype = None
+    default = None
+    for token in p:
+        # TODO? nesting parentheses
+        if token.string == '=':
+            name = tok_list[-1]
+            ptype = tuple(tok_list[:-1])
+            tok_list = []
+        elif token.string in ',)':
+            if name:
+                default = ' '.join(tok_list)
+            elif tok_list:
+                name = tok_list[-1]
+                ptype = tuple(tok_list[:-1])
+            else:
+                return None, token.string != ')'
+            return Param(name, ptype, default), token.string != ')'
+        elif token.string == '.': #actually ::
+            tok_list.append('::')
+        else:
+            tok_list.append(token.string)
 
 def parse_next_decl(isrc, **hints):
     tok_list = []
-    p = tokenize(_iter_read(isrc))  # TEMP: should use actual C/++ tokenizer
+    p = tokenize(_iter_read(isrc))
     for token in p:
         if token.type == ENCODING:
             continue
@@ -54,9 +91,26 @@ def parse_next_decl(isrc, **hints):
                 raise IncompatibleDeclaration(tok_list)
             realname = tok_list[-1]
             return Var(realname, hints.get('name', realname), tuple(tok_list[:-1]))
+
         elif token.string == '(':
-            # is a function
-            pass
+            realname = tok_list[-1]
+            ret_type = tuple(tok_list[:-1])
+            params = []
+            while True:
+                param, is_more = parse_param(p)
+                if param:
+                    params.append(param)
+                if not is_more:
+                    return Func(
+                        realname,
+                        hints.get('name', realname),
+                        ret_type,
+                        params
+                    )
+
+        elif '.' in tok_list:
+            raise IncompatibleDeclaration(tok_list)
+
         else:
             tok_list.append(token.string)
 
@@ -88,6 +142,10 @@ def output_console_bindings(decls, out=sys.stdout):
                 raise NameCollision(decl.name)
             variables[decl.name] = decl
             realvars.add(decl.realname)
+        elif isinstance(decl, Func):
+            if decl.name in functions:
+                raise NameCollision(decl.name)
+            functions[decl.name] = decl
 
     # Set up variable linkage
     for decl in variables.values():
@@ -98,6 +156,55 @@ def output_console_bindings(decls, out=sys.stdout):
         print(f"\t{{ &{decl.realname}, \"{decl.name}\", T_{enumtype(decl.type)} }},", file=out)
     print("};", file=out)
     print(f"const size_t n_console_vars = {len(variables)};", file=out)
+    print(file=out)
+
+    # declare function types so that we can call them
+    for decl in functions.values():
+        print(
+            f"{c_format(decl.ret_type)} {decl.realname}"
+            f"({', '.join(c_format(param.type) for param in decl.params)});",
+            file=out
+        )
+    print(file=out)
+
+    # create wrapper functions
+    for decl in functions.values():
+        print(f"CommandStatus {decl.name}__wrapper(int __n_args, Any* __args, void* __ret_ptr) {{", file=out)
+        print(f"\tif (__n_args < {len(decl.params)}) return CMD_NOT_ENOUGH_ARGS;", file=out)
+        for i, param in enumerate(decl.params):
+            print(f"\t{c_format(param.type)} {param.name} = __args[{i}].v_{enumtype(param.type).lower()};", file=out)
+        call = f"{decl.realname}({', '.join(param.name for param in decl.params)})"
+        if decl.ret_type == ('void',):
+            print(f"\t{call};", file=out)
+        else:
+            print(f"\t{c_format(param.type)} __result = {call};", file=out)
+            print(f"\t*(({c_format(param.type)}*)__ret_ptr) = __result;", file=out)
+        print("\treturn CMD_OK;", file=out)
+        print("}", file=out)
+        print(file=out)
+
+    # create default arguments
+    for decl in functions.values():
+        for i, param in enumerate(decl.params):
+            if param.default is not None:
+                print(f"{c_format(param.type)} const {decl.name}__arg{i}_default = {param.default};", file=out)
+
+    print("const ConsoleFunc console_funcs[] = {", file=out)
+    for decl in functions.values():
+        print("\t{", file=out)
+        print(f"\t\t&{decl.name}__wrapper, \"{decl.name}\", ", file=out)
+        print(f"\t\t{len(decl.params)}, {{", file=out)
+        for param in decl.params:
+            default = (
+                f'(void*)&{decl.name}__arg{i}_default'
+                if param.default is not None else 'nullptr'
+            )
+            print(f"\t\t\t{{ T_{enumtype(param.type)}, \"{param.name}\", {default} }},", file=out)
+        print("\t\t},", file=out)
+        print(f"\t\tT_{enumtype(decl.ret_type)}", file=out)
+        print("\t},", file=out)
+    print("};", file=out)
+    print(f"const size_t n_console_funcs = {len(functions)};", file=out)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

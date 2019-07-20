@@ -44,6 +44,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 }
 
+// @console
+void test_func(int i, float f = 5) {
+	printf("test_func with %d, %f\n", i, f);
+} //nope
+
 constexpr float FPS_SMOOTHING = 0.9f;
 constexpr float CURSOR_BLINK_PERIOD = 1.f;
 constexpr float CURSOR_BLINK_DUTY_CYCLE = 0.5f * CURSOR_BLINK_PERIOD;

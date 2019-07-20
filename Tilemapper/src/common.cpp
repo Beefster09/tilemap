@@ -127,20 +127,22 @@ HexColorParseStatusCode parse_hex_color(const char* str, const char** end, HexCo
 	switch (count) {
 	case 3:  // RGB
 		*color = double_nybbles(maybe_color);
-		// drop-thru intentional
-	case 6:  // RRGGBB
 		*color <<= 8;
 		*color |= 0xff;
+		return HEX_COLOR_OK;
+	case 6:  // RRGGBB
+		*color = (maybe_color << 8) | 0xff;
 		return HEX_COLOR_OK;
 
 	case 4:  // RGBA
 		*color = double_nybbles(maybe_color);
-		// drop-thru intentional
+		return HEX_COLOR_OK;
 	case 8:  // RRGGBBAA
+		*color = maybe_color;
 		return HEX_COLOR_OK;
 
 	default:
-		return HEX_COLOR_INVALID_CHARS;
+		return HEX_COLOR_INVALID_LEN;
 	}
 }
 

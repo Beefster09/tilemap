@@ -347,10 +347,6 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 		glBindVertexArray(vao);
 		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
-
-		//n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "The quick brown fox\n#c[00FFFF]jumps#0 over the lazy dog.", 88, 74);
-		//n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "HOW VEXINGLY QUICK\nDAFT ZEBRAS JUMP!\nLycanthrope\nLVA", 88, 100);
-		//n_glyphs = simple_font.print(fps_glyphs, GLYPH_MAX, "0123456789ABCDEF.", 300, 20);
 	}
 
 	//glDisableVertexAttribArray(1);
