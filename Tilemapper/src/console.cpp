@@ -128,16 +128,37 @@ enum CommandStatus {
 	CMD_ARG_NAME_NOT_FOUND = -2,
 };
 
+static const char* status_string(CommandStatus status) {
+	switch (status) {
+	case CMD_OK: return "Done";
+	case CMD_FAILURE: return "Operation failed";
+	case CMD_FORMAT_ERROR: return "Invalid format";
+	case CMD_TYPE_MISMATCH: return "Type mismatch";
+	case CMD_NOT_ENOUGH_ARGS: return "Not enough arguments";
+	case CMD_DUPLICATE_ARG: return "Argument specified more than once";
+	case CMD_NOT_FOUND: return "Command/variable not found";
+	case CMD_ARG_NAME_NOT_FOUND: return "Invalid argument name";
+	}
+}
+
+static HexColor status_color(CommandStatus status) {
+	switch (status) {
+	case CMD_OK: return 0x00aa00;
+	default: return 0xaa0000;
+	}
+}
+
 struct ConsoleVar {
 	void* ptr;
 	const char* name;
 	ConsoleDataType type;
 };
 
-union Any{ // needed for putting args into an array when dispatching
+union Any { // needed for putting args into an array when dispatching
 	char*    v_string;
 	int      v_int;
 	float    v_float;
+	bool     v_bool;
 	HexColor v_hex_color;
 };
 
@@ -158,6 +179,11 @@ struct ConsoleFunc {
 	ConsoleDataType ret_type;
 };
 
+struct ConsoleScrollback {
+	std::string contents;
+	enum { COMMAND, RESPONSE, LOG } type = COMMAND;
+	CommandStatus resp_status = CMD_OK;
+};
 
 #include "generated/console_commands.h"
 
@@ -167,6 +193,7 @@ static std::string console_line;
 static std::string console_line_saved;
 // a deque might be better, but console command performance doesn't matter much and I don't care how much command history I allocate.
 static std::vector<std::string> console_history;
+static std::vector<ConsoleScrollback> console_scrollback;
 static int history_pos;
 
 //    void stb_textedit_initialize_state(STB_TexteditState *state, int is_single_line)
@@ -198,29 +225,31 @@ public:
 			cur_char++;
 		}
 		char c;
-		while (c = line[cur_char]) {
+		while (c = line[cur_char++]) {
 			switch (c) {
-			case '\'': while (c = line[++cur_char]) {
-				if (c == '\'') break;
-				*tok_buffer++ = c;
-				cur_char++;
-			} break;
-			case '"': while (c = line[++cur_char]) {
-				if (c == '"') break;
-				*tok_buffer++ = c;
-				cur_char++;
-			} break;
-			case '`': while (c = line[++cur_char]) {
-				if (c == '`') break;
-				*tok_buffer++ = c;
-				cur_char++;
-			} break;
-			case ' ': goto parse_end;
+			case '\'':
+				while (c = line[cur_char++]) {
+					if (c == '\'') break;
+					if (c == 0) goto emit_token_end;
+					*tok_buffer++ = c;
+				} break;
+			case '"':
+				while (c = line[cur_char++]) {
+					if (c == '"') break;
+					if (c == 0) goto emit_token_end;
+					*tok_buffer++ = c;
+				} break;
+			case '`': 
+				while (c = line[cur_char++]) {
+					if (c == '`') break;
+					if (c == 0) goto emit_token_end;
+					*tok_buffer++ = c;
+				} break;
+			case ' ': goto emit_token_end;
 			default: *tok_buffer++ = c;
 			}
-			cur_char++;
 		}
-		parse_end:
+	emit_token_end:
 		*tok_buffer++ = 0;
 		return token;
 	}
@@ -249,7 +278,9 @@ static const ConsoleVar* lookup_variable(const char* var_name) {
 static CommandStatus set_variable(const char* var_name, const char* str_value) {
 	if (!var_name || !str_value) return CMD_NOT_ENOUGH_ARGS;
 	auto var = lookup_variable(var_name);
-	if (var == nullptr) return CMD_NOT_FOUND;
+	if (var == nullptr) {
+		return CMD_NOT_FOUND;
+	}
 	switch (var->type) {
 	case T_STRING:
 		return CMD_FAILURE;
@@ -299,18 +330,114 @@ static CommandStatus get_variable(const char* var_name) {
 	return CMD_FAILURE;
 }
 
-static CommandStatus console_submit_command() {
+static CommandStatus get_func_args(const ConsoleFunc& func, ConsoleLexer &lexer, char * &equals, Any * args, bool &retflag) {
+	retflag = true;
+	bool* set_vars = temp_alloc0(bool, func.n_params);
+	int cur_pos_arg = 0;
+	// Populate the arguments with each token
+	while (cur_pos_arg < func.n_params) {
+		int actual_arg = cur_pos_arg;
+		auto arg = lexer.emit_token();
+		if (arg == nullptr) break; // no more tokens
+		char* val = arg;
+		equals = strchr(arg, '=');
+		if (equals) {
+			val = equals + 1;
+			if (equals > arg) { // the equals was not the first character
+				*equals = 0;
+				actual_arg = -1;
+				// find the arg that can be keyworded
+				for (int i = 0; i < func.n_params; i++) {
+					auto& param = func.params[i];
+					if (strcmp(arg, param.name) == 0) {
+						actual_arg = i;
+						break;
+					}
+				}
+				if (actual_arg < 0) return CMD_ARG_NAME_NOT_FOUND;
+			}
+		}
+		if (set_vars[actual_arg]) return CMD_DUPLICATE_ARG;
+		// Actually interpret the token according to the target argument type
+		switch (func.params[actual_arg].type) {
+		case T_STRING:
+			return CMD_FAILURE;
+		case T_HEX_COLOR: {
+			HexColor color;
+			switch (parse_hex_color(val, nullptr, &color)) {
+			case OK:
+				args[actual_arg].v_hex_color = color;
+				break;
+			case INVALID_CHARS: return CMD_TYPE_MISMATCH;
+			case INVALID_LEN: return CMD_FORMAT_ERROR;
+			default: return CMD_TYPE_MISMATCH;
+			}
+		}
+		case T_FLOAT: {
+			float value = strtof(val, nullptr);
+			if (!isnan(value) && !isinf(value)) {
+				args[actual_arg].v_float = value;
+				break;
+			}
+			else return CMD_TYPE_MISMATCH;
+		}
+		case T_INT: {
+			errno = 0;
+			int value = strtol(val, nullptr, 0);
+			if (errno = ERANGE) {
+				args[actual_arg].v_int = value;
+				break;
+			}
+			else return CMD_TYPE_MISMATCH;
+		}
+		default: return CMD_FAILURE;
+		}
+		set_vars[actual_arg] = true;
+		// find the next argument that can be read
+		if (actual_arg == cur_pos_arg) {
+			while (cur_pos_arg < func.n_params && set_vars[cur_pos_arg]) cur_pos_arg++;
+		}
+	}
+	// Set remaining args to defaults
+	while (cur_pos_arg < func.n_params) {
+		if (!set_vars[cur_pos_arg] && func.params[cur_pos_arg].default_value) {
+			switch (func.params[cur_pos_arg].type)
+			{
+			case T_INT:
+				args[cur_pos_arg].v_int = *((int*)func.params[cur_pos_arg].default_value);
+				break;
+			case T_FLOAT:
+				args[cur_pos_arg].v_float = *((float*)func.params[cur_pos_arg].default_value);
+				break;
+			case T_HEX_COLOR:
+				args[cur_pos_arg].v_hex_color = *((HexColor*)func.params[cur_pos_arg].default_value);
+				break;
+			default: return CMD_FAILURE;
+			}
+		}
+		else return CMD_NOT_ENOUGH_ARGS;
+		cur_pos_arg++;
+	}
+	retflag = false;
+	return {};
+}
+
+static CommandStatus console_submit_command(std::string& response) {
 	ConsoleLexer lexer(console_line);
 	char* cmd = lexer.emit_token();
 	char* equals = strchr(cmd, '=');
 	if (equals) {
 		*equals = 0;
-		return set_variable(cmd, equals + 1);
+		auto status = set_variable(cmd, equals + 1);
+		response = status_string(status);
+		return status;
 	}
 	else if (strcmp(cmd, "set") == 0) {
 		auto var = lexer.emit_token();
 		auto val = lexer.emit_token();
-		return set_variable(var, val);
+		auto status = set_variable(var, val);
+		response = status_string(status);
+		return status;
 	}
 	else if (strcmp(cmd, "get") == 0) {
 		auto var = lexer.emit_token();
@@ -318,96 +445,45 @@ static CommandStatus console_submit_command() {
 	}
 	else {
 		auto func = lookup_command(cmd);
-		if (func == nullptr) return CMD_NOT_FOUND;
-		Any* args = temp_alloc(Any, func->n_params);
-		bool* set_vars = temp_alloc0(bool, func->n_params);
-		int cur_pos_arg = 0;
-		// Populate the arguments with each token
-		while (cur_pos_arg < func->n_params) {
-			int actual_arg = cur_pos_arg;
-			auto arg = lexer.emit_token();
-			if (arg == nullptr) break; // no more tokens
-			char* val = arg;
-			equals = strchr(arg, '=');
-			if (equals) {
-				val = equals + 1;
-				if (equals > arg) { // the equals was not the first character
-					*equals = 0;
-					actual_arg = -1;
-					// find the arg that can be keyworded
-					for (int i = 0; i < func->n_params; i++) {
-						auto& param = func->params[i];
-						if (strcmp(arg, param.name) == 0) {
-							actual_arg = i;
-							break;
-						}
-					}
-					if (actual_arg < 0) return CMD_ARG_NAME_NOT_FOUND;
-				}
-			}
-			if (set_vars[actual_arg]) return CMD_DUPLICATE_ARG;
-			// Actually interpret the token according to the target argument type
-			switch (func->params[actual_arg].type) {
-			case T_STRING:
-				return CMD_FAILURE;
-			case T_HEX_COLOR: {
-				HexColor color;
-				switch (parse_hex_color(val, nullptr, &color)) {
-				case OK:
-					args[actual_arg].v_hex_color = color;
-					break;
-				case INVALID_CHARS: return CMD_TYPE_MISMATCH;
-				case INVALID_LEN: return CMD_FORMAT_ERROR;
-				default: return CMD_TYPE_MISMATCH;
-				}
-			}
-			case T_FLOAT: {
-				float value = strtof(val, nullptr);
-				if (!isnan(value) && !isinf(value)) {
-					args[actual_arg].v_float = value;
-					break;
-				}
-				else return CMD_TYPE_MISMATCH;
-			}
-			case T_INT: {
-				errno = 0;
-				int value = strtol(val, nullptr, 0);
-				if (errno = ERANGE) {
-					args[actual_arg].v_int = value;
-					break;
-				}
-				else return CMD_TYPE_MISMATCH;
-			}
-			default: return CMD_FAILURE;
-			}
-			set_vars[actual_arg] = true;
-			// find the next argument that can be read
-			if (actual_arg == cur_pos_arg) {
-				while (cur_pos_arg < func->n_params && set_vars[cur_pos_arg]) cur_pos_arg++;
-			}
+		if (func == nullptr) {
+			response = "Command \"";
+			response += cmd;
+			response += "\" does not exist";
+			return CMD_NOT_FOUND;
 		}
-		// Set remaining args to defaults
-		while (cur_pos_arg < func->n_params) {
-			if (!set_vars[cur_pos_arg] && func->params[cur_pos_arg].default_value) {
-				switch (func->params[cur_pos_arg].type)
-				{
-				case T_INT:
-					args[cur_pos_arg].v_int = *((int*)func->params[cur_pos_arg].default_value);
-					break;
-				case T_FLOAT:
-					args[cur_pos_arg].v_float = *((float*)func->params[cur_pos_arg].default_value);
-					break;
-				case T_HEX_COLOR:
-					args[cur_pos_arg].v_hex_color = *((HexColor*)func->params[cur_pos_arg].default_value);
-					break;
-				default: return CMD_FAILURE;
-				}
+		Any* args = temp_alloc(Any, func->n_params);
+		{
+			bool retflag;
+			CommandStatus retval = get_func_args(*func, lexer, equals, args, retflag);
+			if (retflag) {
+				response = status_string(retval);
+				return retval;
 			}
-			else return CMD_NOT_ENOUGH_ARGS;
-			cur_pos_arg++;
 		}
 		Any result;
-		return (*func->ptr)(func->n_params, args, &result);
+		auto status = (*func->ptr)(func->n_params, args, &result);
+		if (status == CMD_OK) {
+			switch (func->ret_type) {
+			case T_VOID: {
+				response = "Done";
+			} break;
+			case T_INT: {
+				response = std::to_string(result.v_int);
+			} break;
+			case T_FLOAT: {
+				response = std::to_string(result.v_float);
+			} break;
+			case T_HEX_COLOR: {
+				char hex_color_str[9];
+				snprintf(hex_color_str, 9, "%08X", result.v_hex_color);
+				response = hex_color_str;
+			} break;
+			case T_BOOL: {
+				response = result.v_bool ? "true" : "false";
+			} break;
+			}
+		}
+		return status;
 	}
 }
 
@@ -439,8 +515,11 @@ void init_console() {
 
 int console_type_key(int keycode) {
 	if (keycode == GLFW_KEY_ENTER) {
-		auto status = console_submit_command();
+		std::string response;
+		auto status = console_submit_command(response);
 		// TODO: print some sort of response in a command history
+		console_scrollback.push_back({console_line, ConsoleScrollback::COMMAND});
+		console_scrollback.push_back({response, ConsoleScrollback::RESPONSE, status});
 		console_history.push_back(console_line);
 		history_pos = 0;
 		console_line.clear();
@@ -461,24 +540,51 @@ int console_type_key(int keycode) {
 	return 0;
 }
 
-constexpr int CONSOLE_BUFFER_SIZE = 1024;
-static char console_line_buffer[CONSOLE_BUFFER_SIZE];
-const char* get_console_line(bool show_cursor = true) {
+static size_t escape_hash(char* const dest, const std::string& src, size_t buf_size) {
 	int i = 0;
-	if (show_cursor) {
-		i = snprintf(console_line_buffer, sizeof(console_line_buffer), "\x1%d\x2", console_state.cursor + 2);
-	}
-	console_line_buffer[i++] = '>';
-	console_line_buffer[i++] = ' ';
-	auto end = console_line.cend();
-	for (auto it = console_line.cbegin(); it != end; it++) {
-		if (i + 1 >= CONSOLE_BUFFER_SIZE) return nullptr;
-		console_line_buffer[i++] = *it;
-		if (*it == '#') { // Escape # since it's meaningful
-			if (i + 1 >= CONSOLE_BUFFER_SIZE) return nullptr;
-			console_line_buffer[i++] = '#';
+	auto end = src.cend();
+	for (auto it = src.cbegin(); it != end; it++) {
+		if (i + 1 >= buf_size) break;
+		dest[i++] = *it;
+		if (*it == '#') {
+			if (i + 1 >= buf_size) break;
+			dest[i++] = '#';
 		}
 	}
-	console_line_buffer[i] = 0;
-	return console_line_buffer;
+	dest[i] = 0;
+	return i;
+}
+
+const char* get_console_line(bool show_cursor = true) {
+	size_t capacity = console_line.size() * 2 + 16;
+	char* buf = temp_alloc(char, capacity);
+	int i = 0;
+	if (show_cursor) {
+		i = snprintf(buf, capacity, "\x1%d\x2", console_state.cursor + 2);
+	}
+	buf[i++] = '>';
+	buf[i++] = ' ';
+	escape_hash(buf + i, console_line, capacity - i);
+	return buf;
+}
+
+const char* get_console_scrollback_line(int line_offset) {
+	if (line_offset <= 0) return nullptr;
+	int sb_index = console_scrollback.size() - line_offset;
+	if (sb_index < 0) return nullptr;
+	const auto& sb_line = console_scrollback[sb_index];
+	size_t capacity = sb_line.contents.size() * 2 + 32;
+	char* buf = temp_alloc(char, capacity);
+	switch (sb_line.type) {
+	case ConsoleScrollback::COMMAND: {
+		int i = snprintf(buf, capacity, "#c[888]> ");
+		escape_hash(buf + i, sb_line.contents.c_str(), capacity - i);
+		return buf;
+	}
+	case ConsoleScrollback::RESPONSE: {
+		int i = snprintf(buf, capacity, "#c[888]---> #c[%06x]", status_color(sb_line.resp_status));
+		escape_hash(buf + i, sb_line.contents.c_str(), capacity - i);
+		return buf;
+	}
+	}
 }

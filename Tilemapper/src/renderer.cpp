@@ -18,6 +18,8 @@ constexpr int PRINT_CMD_SS_MAX = 96;
 
 constexpr int CONSOLE_LINE_OFFSET_LEFT = 8;
 constexpr int CONSOLE_LINE_OFFSET_BOTTOM = 15;
+constexpr int CONSOLE_LINE_SCROLLBACK_SPACING = 3;
+constexpr int SCROLLBACK_PADDING_TOP = 5;
 
 
 struct GlyphPrintData {
@@ -361,13 +363,14 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 
 		text_shader.use();
 		//text_shader.set(text_slots.layer, 500.f);
+		text_shader.setCamera(ui_camera);
+		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
 
 		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
-
 		glVertexAttribIPointer(1, 4, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, src_x));
 		glEnableVertexAttribArray(1);
 		glVertexAttribDivisor(1, 1);
@@ -378,21 +381,22 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		glEnableVertexAttribArray(3);
 		glVertexAttribDivisor(3, 1);
 
-		int n_glyphs = simple_font.print(glyph_buffer, 16, get_console_line(show_cursor), CONSOLE_LINE_OFFSET_LEFT, v_height - CONSOLE_LINE_OFFSET_BOTTOM);
-
-		text_shader.setCamera(ui_camera);
-		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
-		//text_shader.set(text_slots.layer, 500.f);
+		int n_glyphs = simple_font.print(glyph_buffer, GLYPH_MAX, get_console_line(show_cursor), CONSOLE_LINE_OFFSET_LEFT, v_height - CONSOLE_LINE_OFFSET_BOTTOM);
 
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
-		//renderer.print_text(10, virtual_height - 20, "%s", get_console_line(fmod(time, CURSOR_BLINK_PERIOD) < CURSOR_BLINK_DUTY_CYCLE));
-	}
 
-	//glDisableVertexAttribArray(1);
-	//glDisableVertexAttribArray(2);
-	//glDisableVertexAttribArray(3);
-	//glDisableVertexAttribArray(4);
+		int scrollback_base = v_height - CONSOLE_LINE_OFFSET_BOTTOM - CONSOLE_LINE_SCROLLBACK_SPACING;
+		int scrollback_max = (scrollback_base - SCROLLBACK_PADDING_TOP) / simple_font.line_height;
+		for (int i = 1; i < scrollback_max; i++) {
+			const auto* sb_line = get_console_scrollback_line(i);
+			if (sb_line == nullptr) break;
+			n_glyphs = simple_font.print(glyph_buffer, GLYPH_MAX, sb_line, CONSOLE_LINE_OFFSET_LEFT, scrollback_base - (i * simple_font.line_height));
+
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
+			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+		}
+	}
 
 	// virtual resolution scaling
 

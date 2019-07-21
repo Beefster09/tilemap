@@ -166,7 +166,7 @@ StatusCode parse_bool(const char* str, const char** end, bool* out) {
 // MAYBE? have this be opt-in per thread since the audio mixer thread (and possibly others) might not need it.
 
 #ifndef TEMP_STORAGE_SIZE
-#define TEMP_STORAGE_SIZE (16 * 1024) // 16KB
+#define TEMP_STORAGE_SIZE (64 * 1024) // 64KB
 #endif
 
 thread_local char* TEMP_STORAGE = nullptr;

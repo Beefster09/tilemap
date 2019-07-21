@@ -7,3 +7,4 @@ int console_type_key(int keycode);
 
 /// Gets a string that can be rendered by the renderer
 const char* get_console_line(bool show_cursor);
+const char* get_console_scrollback_line(int line_offset);
