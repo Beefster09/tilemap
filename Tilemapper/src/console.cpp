@@ -429,6 +429,8 @@ static void console_history_scroll(int offset) {
 		history_pos = 0;
 		console_line = console_line_saved;
 	}
+	stb_textedit_initialize_state(&console_state, true);
+	console_state.cursor = console_line.size();
 }
 
 void init_console() {
@@ -459,14 +461,24 @@ int console_type_key(int keycode) {
 	return 0;
 }
 
-static char console_line_buffer[1024];
+constexpr int CONSOLE_BUFFER_SIZE = 1024;
+static char console_line_buffer[CONSOLE_BUFFER_SIZE];
 const char* get_console_line(bool show_cursor = true) {
+	int i = 0;
 	if (show_cursor) {
-		// TODO: escape #, use temp storage
-		snprintf(console_line_buffer, sizeof(console_line_buffer), "\x1%d\x2%s", console_state.cursor, console_line.c_str());
-		return console_line_buffer;
+		i = snprintf(console_line_buffer, sizeof(console_line_buffer), "\x1%d\x2", console_state.cursor + 2);
 	}
-	else {
-		return console_line.c_str();
+	console_line_buffer[i++] = '>';
+	console_line_buffer[i++] = ' ';
+	auto end = console_line.cend();
+	for (auto it = console_line.cbegin(); it != end; it++) {
+		if (i + 1 >= CONSOLE_BUFFER_SIZE) return nullptr;
+		console_line_buffer[i++] = *it;
+		if (*it == '#') { // Escape # since it's meaningful
+			if (i + 1 >= CONSOLE_BUFFER_SIZE) return nullptr;
+			console_line_buffer[i++] = '#';
+		}
 	}
+	console_line_buffer[i] = 0;
+	return console_line_buffer;
 }

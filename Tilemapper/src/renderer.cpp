@@ -7,6 +7,7 @@
 
 #include "renderer.h"
 #include "text.h"
+#include "console.h"
 
 constexpr int CHUNK_MAX = 64;
 constexpr int SPRITE_MAX = 512;
@@ -14,6 +15,9 @@ constexpr int GLYPH_MAX = 256;
 constexpr int STRING_STORAGE_SIZE = 1024 * 16;
 constexpr int PRINT_CMD_WS_MAX = 32;
 constexpr int PRINT_CMD_SS_MAX = 96;
+
+constexpr int CONSOLE_LINE_OFFSET_LEFT = 8;
+constexpr int CONSOLE_LINE_OFFSET_BOTTOM = 15;
 
 
 struct GlyphPrintData {
@@ -78,6 +82,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	sprite_shader(__SHADER(SPRITE)),
 	scale_shader(__SHADER(SCALE)),
 	text_shader(__SHADER(TEXT)),
+	overlay_shader(__SHADER(OVERLAY)),
 	chunks(CHUNK_MAX),
 	sprites(SPRITE_MAX)
 {
@@ -158,7 +163,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glDisable(GL_CULL_FACE);
 }
 
-void Renderer::draw_frame(float fps, bool show_fps) {
+void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show_cursor) {
 #ifndef NDEBUG
 	float start_time = glfwGetTime();
 #endif
@@ -179,7 +184,7 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 	glViewport(0, 0, v_width, v_height);
 	glClearColor(0.0f, 0.1f, 0.4f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-
+	glBindVertexArray(vao);
 	// Draw tilemaps and sprites
 
 	enum { NONE = 0, TILECHUNK, SPRITE } current_shader = NONE;
@@ -217,7 +222,6 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 			glEnableVertexAttribArray(2);
 			glVertexAttribDivisor(2, 1);
 
-			glBindVertexArray(vao);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, chunk.chunk->width * chunk.chunk->height);
 
 			ci++;
@@ -313,7 +317,6 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 			text_shader.set(text_slots.glyph_atlas, it->font->glyph_atlas->bind(0));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
-			glBindVertexArray(vao);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
 		}
 	}
@@ -325,7 +328,6 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 			text_shader.set(text_slots.glyph_atlas, it->font->glyph_atlas->bind(0));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
-			glBindVertexArray(vao);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
 		}
 	}
@@ -345,8 +347,46 @@ void Renderer::draw_frame(float fps, bool show_fps) {
 		//text_shader.set(text_slots.layer, 500.f);
 
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
-		glBindVertexArray(vao);
 		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+	}
+
+	if (show_console) {
+		overlay_shader.use();
+
+		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+		glEnableVertexAttribArray(0);
+
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+		text_shader.use();
+		//text_shader.set(text_slots.layer, 500.f);
+
+		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
+
+		glVertexAttribIPointer(1, 4, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, src_x));
+		glEnableVertexAttribArray(1);
+		glVertexAttribDivisor(1, 1);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, x));
+		glEnableVertexAttribArray(2);
+		glVertexAttribDivisor(2, 1);
+		glVertexAttribIPointer(3, 1, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, rgba));
+		glEnableVertexAttribArray(3);
+		glVertexAttribDivisor(3, 1);
+
+		int n_glyphs = simple_font.print(glyph_buffer, 16, get_console_line(show_cursor), CONSOLE_LINE_OFFSET_LEFT, v_height - CONSOLE_LINE_OFFSET_BOTTOM);
+
+		text_shader.setCamera(ui_camera);
+		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
+		//text_shader.set(text_slots.layer, 500.f);
+
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
+		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
+		//renderer.print_text(10, virtual_height - 20, "%s", get_console_line(fmod(time, CURSOR_BLINK_PERIOD) < CURSOR_BLINK_DUTY_CYCLE));
 	}
 
 	//glDisableVertexAttribArray(1);
@@ -423,18 +463,30 @@ bool Renderer::_print_text(Font* font, CoordinateSystem coords, float x, float y
 	return true;
 }
 
-#define _HANDOFF(FONT, COORDS) {\
+#define _HANDOFF(FONT, COORDS) do{\
 	va_list args;\
 	va_start(args, format);\
 	bool ret = _print_text((FONT), (COORDS), x, y, format, args);\
 	va_end(args);\
 	return ret;\
+} while(0)
+
+bool Renderer::print_text(Font* font, CoordinateSystem coords, float x, float y, const char* format, ...) {
+	_HANDOFF(font, coords);
 }
 
-bool Renderer::print_text(Font* font, CoordinateSystem coords, float x, float y, const char* format, ...) _HANDOFF(font, coords)
-bool Renderer::print_text(CoordinateSystem coords, float x, float y, const char* format, ...)             _HANDOFF(&simple_font, coords)
-bool Renderer::print_text(Font* font, float x, float y, const char* format, ...)                          _HANDOFF(font, SCREEN_SPACE)
-bool Renderer::print_text(float x, float y, const char* format, ...)                                      _HANDOFF(&simple_font, SCREEN_SPACE)
+bool Renderer::print_text(CoordinateSystem coords, float x, float y, const char* format, ...) {
+	_HANDOFF(&simple_font, coords);
+}
+
+bool Renderer::print_text(Font* font, float x, float y, const char* format, ...) {
+	_HANDOFF(font, SCREEN_SPACE);
+}
+
+bool Renderer::print_text(float x, float y, const char* format, ...) {
+	_HANDOFF(&simple_font, SCREEN_SPACE);
+}
+
 #undef _HANDOFF
 
 u32 Renderer::_sort_chunks(u32* buffer) {

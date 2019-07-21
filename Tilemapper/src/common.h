@@ -70,7 +70,7 @@ inline T clamp(T a, T lo = 0, T hi = 1) {
 #define PATH_SEP '/'
 #endif
 #define _STRINGIFY(S) #S
-#define __FILE_BASENAME__ strrchr(__FILE__, PATH_SEP)
+#define __FILE_BASENAME__ (strrchr(__FILE__, PATH_SEP) + 1)
 #ifdef NDEBUG
 #define ERR_LOG(FMT, ...) do{}while(0)
 #else

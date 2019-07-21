@@ -35,7 +35,7 @@ static inline bool handle_color_code(const char* const fulltext, const char* con
 static int get_kerning_offset(const KernPair* const kerning, const int n_kern_pairs, int left, int right) {
 	if (left <= ' ' || right <= ' ') return 0;
 	int lo = 0, hi = n_kern_pairs, mid = n_kern_pairs / 2;
-	while (lo < hi) {
+	while (lo < hi) { // Currently a binary search. TODO: switch to a hashtable
 		int cmp = kerning[mid].left - left;
 		if (cmp == 0) {
 			cmp = kerning[mid].right - right;
@@ -59,18 +59,20 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* text
 	int y_offset = 0;
 	u32 rgba = 0xFFFFFFFF;
 	// cursor data
-	const char* cursor_char = nullptr;
+	int cursor_char = -1;
 	bool cursor_set = false;
 	int cursor_x = 0;
 	int cursor_y = 0;
 	if (text[0] == TEXT_CURSOR) {
 		char* end;
-		auto cursor_offset = strtoul(text + 1, &end, TEXT_CURSOR_RADIX);
-		text = end;
-		cursor_char = text + cursor_offset + 1;
+		cursor_char = strtoul(text + 1, &end, TEXT_CURSOR_RADIX);
+		end = strchr(end, TEXT_CURSOR_END);
+		if (end == nullptr) return 0;
+		text = end + 1;
 	}
-	for (const char* c = text; *c; c++) {
-		if (c == cursor_char) {
+	int current_char = 0;
+	for (const char* c = text; *c; c++, current_char++) {
+		if (current_char == cursor_char) {
 			cursor_x = x_offset;
 			cursor_y = y_offset;
 			cursor_set = true;
@@ -96,7 +98,7 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* text
 				goto handle_ascii;
 			case 'c': case 'C': { // color
 				if (c[2] != '[') {
-					fprintf(stderr, "Found color control without '[' in string '%s'", text);
+					ERR_LOG("Found color control without '[' in string '%s'", text);
 					goto handle_ascii;
 				}
 				const char* end;
@@ -114,10 +116,10 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* text
 				break;
 			}
 			case 0:
-				fprintf(stderr, "Found '#' at end of string '%s'\n", text);
+				ERR_LOG("Found '#' at end of string '%s'\n", text);
 				goto handle_ascii;
 			default:
-				fprintf(stderr, "Unsupported control code #%c in string '%s'\n", c[1], text);
+				ERR_LOG("Unsupported control code #%c in string '%s'\n", c[1], text);
 				return -1;
 			}
 		}
@@ -125,7 +127,7 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* text
 			handle_ascii:
 
 			if (len >= buf_size) {
-				fprintf(stderr, "WARNING: Unable to render the text \"%s\" with only %d glyphs.\n", text, buf_size);
+				ERR_LOG("WARNING: Unable to render the text \"%s\" with only %zd glyphs.\n", text, buf_size);
 				return len;
 			}
 
@@ -142,7 +144,7 @@ int Font::print(GlyphRenderData* const buffer, size_t buf_size, const char* text
 		}
 		// TODO: UTF-8
 	}
-	if (cursor_char != nullptr && len < buf_size) {
+	if (cursor_char >= 0 && len < buf_size) {
 		if (!cursor_set) {
 			cursor_x = x_offset;
 			cursor_y = y_offset;

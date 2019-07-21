@@ -4,6 +4,6 @@
 
 void init_console();
 int console_type_key(int keycode);
-const char* get_console_line(bool show_cursor);
 
-void register_commands();
+/// Gets a string that can be rendered by the renderer
+const char* get_console_line(bool show_cursor);

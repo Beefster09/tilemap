@@ -40,7 +40,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
 
-static bool console_active = true;
+static bool console_active = false;
 static bool is_fullscreen = false;
 
 void toggle_fullscreen(GLFWwindow* window) {
@@ -62,6 +62,16 @@ void toggle_fullscreen(GLFWwindow* window) {
 	}
 }
 
+// @console name=toggle_fullscreen
+void console_toggle_fullscreen() {
+	toggle_fullscreen(glfwGetCurrentContext());
+}
+
+// @console name=quit
+void __quit() {
+	glfwSetWindowShouldClose(glfwGetCurrentContext(), true);
+}
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	switch (key) {
 	case GLFW_KEY_RIGHT_SHIFT:
@@ -76,10 +86,24 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	case GLFW_KEY_F2:
 		if (action == GLFW_RELEASE) show_fps = !show_fps;
 		return;
-	case GLFW_KEY_F10: {
+	case GLFW_KEY_F11:
 		if (action == GLFW_RELEASE) toggle_fullscreen(window);
 		return;
-	}
+	case GLFW_KEY_ESCAPE:
+		if (action == GLFW_RELEASE) {
+			if (console_active) {
+				console_active = false;
+			}
+			else {
+				glfwSetWindowShouldClose(window, true);
+			}
+			return;
+		}
+	case GLFW_KEY_GRAVE_ACCENT:
+		if (action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
+			console_active = !console_active;
+			return;
+		}
 	default:
 		if (console_active && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 			console_type_key(key | (mods << GLFW_TO_CONSOLE_SHIFT));
@@ -186,14 +210,10 @@ int main(int argc, char* argv[]) {
 			renderer.print_text(88, 74, "The quick brown fox\n#c[%x%x%x]jumps#0 over the lazy dog.", r, g, b);
 			renderer.print_text(88, 100, "HOW\tVEXINGLY\tQUICK\nDAFT\tZEBRAS\tJUMP!\nLycanthrope: Werewolf.\nLVA\niji\nf_J,T.V,P.");
 			renderer.print_text(300, 20, "01234,56789_ABC;DEF.##$");
-			renderer.print_text(10, virtual_height - 20, "%s", get_console_line(fmod(time, CURSOR_BLINK_PERIOD) < CURSOR_BLINK_DUTY_CYCLE) );
-			renderer.draw_frame(fps, show_fps);
+
+			renderer.draw_frame(fps, show_fps, console_active, fmod(time, CURSOR_BLINK_PERIOD) < CURSOR_BLINK_DUTY_CYCLE);
 
 			logOpenGLErrors();
-
-			if(glfwGetKey(window, GLFW_KEY_ESCAPE)) {
-				glfwSetWindowShouldClose(window, true);
-			}
 
 			temp_storage_clear();
 		}

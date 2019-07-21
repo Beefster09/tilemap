@@ -37,12 +37,12 @@ bitmap inline
     X . . . X   . . X . .   X X . X X   X . . . X   . . X . .       X . . . .   X X . . X   X X X X X X   . . . .   . . . . .
     . X X X .   . . X . .   X . . . X   X . . . X   . . X . .       X X X X X   . . X . X   . X . . X .   . . . .   . . X . .
     #   a           b           c           d           e               f           g           h       i    j
-    . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . . X X .   . X X X .   X . . . .   X . . X .   . . . . .
-    . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . X . . .   X . . . X   X . . . .   . . . . .   . . . . .
-    . X X X .   X X X X .   . X X X .   . X X X X   . X X X .       . X . . .   X . . . X   X X X X .   X . . X .   . . . . .
-    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X . .   X . . . X   X . . . X   X . . X .   . . . . .
-    X . . . X   X . . . X   X . . . .   X . . . X   X X X X .       . X . . .   . X X X X   X . . . X   X . . X .   . . . . .
-    X . . X X   X . . . X   X . . . X   X . . . X   X . . . .       . X . . .   . . . . X   X . . . X   X . . X .   . . . . .
+    . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . . X X .   . X X X .   X . . . .   X . . X .   . . .  .
+    . . . . .   X . . . .   . . . . .   . . . . X   . . . . .       . X . . .   X . . . X   X . . . .   . . . . .   . . X . .
+    . X X X .   X X X X .   . X X X .   . X X X X   . X X X .       . X . . .   X . . . X   X X X X .   X . . X .   . X . X .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X . .   X . . . X   X . . . X   X . . X .   X . . . X
+    X . . . X   X . . . X   X . . . .   X . . . X   X X X X .       . X . . .   . X X X X   X . . . X   X . . X .   . X . X .
+    X . . X X   X . . . X   X . . . X   X . . . X   X . . . .       . X . . .   . . . . X   X . . . X   X . . X .   . . X . .
     . X X . X   X X X X .   . X X X .   . X X X X   . X X X X       . X . . .   . X X X .   X . . . X   X . . X .   . . . . .
     #   k           l           m           n           o               p           q           r           s           t
     X . . . .   X . . . .   . . . . .   . . . . .   . . . . .       X X X X .   . X X X X   . . . . .   . . . X .   . X . . .
@@ -100,6 +100,8 @@ glyphs
     '$': 40, 42, 5, 7, 6
     '/': 30, 42, 3, 7, 4
     '\': 32, 42, 3, 7, 4
+    '<': 45, 29, 3, 5, 4, 0, 1
+    '>': 47, 29, 3, 5, 4, 0, 1
 end
 
 kerning

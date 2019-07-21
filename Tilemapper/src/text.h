@@ -41,6 +41,6 @@ struct Font {
 
 void init_simple_font();
 
-constexpr char TEXT_CURSOR     = '\01';
-constexpr char TEXT_CURSOR_END = '\02';
+constexpr char TEXT_CURSOR      = '\01';
+constexpr char TEXT_CURSOR_END  = '\02';
 constexpr int TEXT_CURSOR_RADIX = 10;

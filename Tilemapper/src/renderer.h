@@ -66,7 +66,7 @@ private:
 	int v_width, v_height; // virtual resolution
 
 	GLuint vao, fbo, tile_vbo, sprite_vbo, text_vbo;
-	Shader tile_shader, scale_shader, sprite_shader, text_shader;
+	Shader tile_shader, scale_shader, sprite_shader, text_shader, overlay_shader;
 
 #define __SLOT(VAR) int VAR;
 	struct {
@@ -108,7 +108,7 @@ private:
 	bool _print_text(Font* font, CoordinateSystem coords, float x, float y, const char* format, va_list args);
 public:
 	Renderer(GLFWwindow* window, int width, int height);
-	void draw_frame(float fps, bool show_fps);
+	void draw_frame(float fps, bool show_fps, bool show_console, bool show_cursor);
 
 	ChunkID add_chunk(const TileChunk* const chunk, float x, float y, i32 layer);
 	bool remove_chunk(const ChunkID id);

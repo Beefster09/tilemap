@@ -93,6 +93,8 @@ def parse_next_decl(isrc, **hints):
             return Var(realname, hints.get('name', realname), tuple(tok_list[:-1]))
 
         elif token.string == '(':
+            if 'static' in tok_list:
+                raise IncompatibleDeclaration(tok_list)
             realname = tok_list[-1]
             ret_type = tuple(tok_list[:-1])
             params = []
@@ -169,7 +171,7 @@ def output_console_bindings(decls, out=sys.stdout):
 
     # create wrapper functions
     for decl in functions.values():
-        print(f"CommandStatus {decl.name}__wrapper(int __n_args, Any* __args, void* __ret_ptr) {{", file=out)
+        print(f"static CommandStatus {decl.name}__wrapper(int __n_args, Any* __args, void* __ret_ptr) {{", file=out)
         print(f"\tif (__n_args < {len(decl.params)}) return CMD_NOT_ENOUGH_ARGS;", file=out)
         for i, param in enumerate(decl.params):
             print(f"\t{c_format(param.type)} {param.name} = __args[{i}].v_{enumtype(param.type).lower()};", file=out)
