@@ -19,7 +19,7 @@ constexpr u64 LARGE_PRIME = 541894198537;
 constexpr int LEFT_PRIME  = 926153;
 constexpr int RIGHT_PRIME = 1698461;
 static u64 hash_kern_pair(int left, int right) {
-	u64 pair = (left * LEFT_PRIME) + (right * RIGHT_PRIME);
+	u64 pair = ((left * LEFT_PRIME) << 20) + (right * RIGHT_PRIME);
 	// Xorshift64
 	pair ^= pair << 13;
 	pair ^= pair >> 7;
@@ -73,11 +73,11 @@ static void kern_table_insert(KerningData& kerning, KernPair pair) { // Uses rob
 	DBG_LOG("Kerning Hash ('%c':'%c') ==> %016llx (index %lld)\n", pair.left, pair.right, hash, index);
 	u16 probe_count = 0;
 	while (kerning.table[index].occupied) {
-		probe_count++;
-		index += 1;
+		probe_count += 1;
+		index += probe_count;
 		index &= kerning.mask;
 	}
-	// TODO: Robin Hood hashing
+	// TODO maybe: Robin Hood hashing
 	kerning.table[index] = {
 		(u32) pair.left, (u32) pair.right,
 		pair.kern_offset,
@@ -106,11 +106,11 @@ static int get_kerning_offset(const KerningData& const kerning, int left, int ri
 	if (left <= ' ' || right <= ' ') return 0;
 	auto hash = hash_kern_pair(left, right);
 	auto index = hash & kerning.mask;
-	for (int probe_count = 0; probe_count < kerning.max_probe_count; probe_count++) {
+	for (int probe_count = 1; probe_count <= kerning.max_probe_count; probe_count++) {
 		auto& entry = kerning.table[index];
 		if (!entry.occupied) return 0;
 		if (entry.left == left && entry.right == right) return entry.kern_offset;
-		index += 1;
+		index += probe_count;
 		index &= kerning.mask;
 	}
 	return 0;
