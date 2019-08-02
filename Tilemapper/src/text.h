@@ -3,13 +3,7 @@
 #include <unordered_map>
 #include "common.h"
 
-class Texture;
-
-struct GlyphData {
-	i32 src_x, src_y, src_w, src_h;
-	i32 advance;
-	i32 offset_x = 0, offset_y = 0;
-};
+struct Font;
 
 struct GlyphRenderData {
 	float x, y;
@@ -17,27 +11,14 @@ struct GlyphRenderData {
 	u32 rgba;
 };
 
-struct KernPair {
-	int left, right;
-	int kern_offset;
+struct FontDims {
+	i32 space_width;
+	i32 line_height;
 };
 
-struct Font {
-	Texture* glyph_atlas;
-	const GlyphData ascii_glyphs[94]; // glyphs from 0x21-0x7E
-	struct {
-		i32 src_x, src_y, src_w, src_h;
-		i32 offset_x = 0, offset_y = 0;
-	} cursor;
-	const i32 space_width;
-	const i32 line_height;
-	const KernPair* kern_pairs;
-	const size_t n_kern_pairs;
-
-	// std::unordered_map<u32, GlyphData> other_glyphs;
-
-	int print(GlyphRenderData* const buffer, size_t buf_size, const char* text, float x, float y) const;
-};
+int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_size, const char* text, float x, float y);
+FontDims get_font_dimensions(const Font& font);
+int bind_font_glyph_atlas(Font& font, int slot = 0);
 
 void init_simple_font();
 

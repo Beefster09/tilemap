@@ -315,8 +315,8 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 	if (print_later_ws > print_later_ws_start) {
 		text_shader.setCamera(world_camera);
 		for (auto it = print_later_ws_start; it < print_later_ws; it++) {
-			int n_glyphs = it->font->print(glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
-			text_shader.set(text_slots.glyph_atlas, it->font->glyph_atlas->bind(0));
+			int n_glyphs = print_glyphs(it->font, glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
+			text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(*it->font, 0));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
@@ -326,8 +326,8 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 	if (print_later_ss > print_later_ss_start) {
 		text_shader.setCamera(ui_camera);
 		for (auto it = print_later_ss_start; it < print_later_ss; it++) {
-			int n_glyphs = it->font->print(glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
-			text_shader.set(text_slots.glyph_atlas, it->font->glyph_atlas->bind(0));
+			int n_glyphs = print_glyphs(it->font, glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
+			text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(*it->font, 0));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
@@ -339,13 +339,13 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		char fps_msg[32];
 		u32 fps_color = fps > 55.f ? 0x00FF00 : fps > 25.f ? 0xFFFF00 : 0xFF0000;
 		snprintf(fps_msg, sizeof(fps_msg), "#c[%06x]%d FPS", fps_color, (int)fps);
-		int n_glyphs = simple_font.print(glyph_buffer, 16, fps_msg, 1, 1);
+		int n_glyphs = print_glyphs(&simple_font, glyph_buffer, 16, fps_msg, 1, 1);
 		assert(n_glyphs >= 0);
 
 		if (!(print_later_ss > print_later_ss_start)) {
 			text_shader.setCamera(ui_camera);
 		}
-		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
+		text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(simple_font, 0));
 		//text_shader.set(text_slots.layer, 500.f);
 
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
@@ -364,7 +364,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		text_shader.use();
 		//text_shader.set(text_slots.layer, 500.f);
 		text_shader.setCamera(ui_camera);
-		text_shader.set(text_slots.glyph_atlas, simple_font.glyph_atlas->bind(0));
+		text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(simple_font, 0));
 
 		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
@@ -381,17 +381,18 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		glEnableVertexAttribArray(3);
 		glVertexAttribDivisor(3, 1);
 
-		int n_glyphs = simple_font.print(glyph_buffer, GLYPH_MAX, get_console_line(show_cursor), CONSOLE_LINE_OFFSET_LEFT, v_height - CONSOLE_LINE_OFFSET_BOTTOM);
+		int n_glyphs = print_glyphs(&simple_font, glyph_buffer, GLYPH_MAX, get_console_line(show_cursor), CONSOLE_LINE_OFFSET_LEFT, v_height - CONSOLE_LINE_OFFSET_BOTTOM);
 
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 		glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
 
+		auto line_height = get_font_dimensions(simple_font).line_height;
 		int scrollback_base = v_height - CONSOLE_LINE_OFFSET_BOTTOM - CONSOLE_LINE_SCROLLBACK_SPACING;
-		int scrollback_max = (scrollback_base - SCROLLBACK_PADDING_TOP) / simple_font.line_height;
+		int scrollback_max = (scrollback_base - SCROLLBACK_PADDING_TOP) / line_height;
 		for (int i = 1; i < scrollback_max; i++) {
 			const auto* sb_line = get_console_scrollback_line(i);
 			if (sb_line == nullptr) break;
-			n_glyphs = simple_font.print(glyph_buffer, GLYPH_MAX, sb_line, CONSOLE_LINE_OFFSET_LEFT, scrollback_base - (i * simple_font.line_height));
+			n_glyphs = print_glyphs(&simple_font, glyph_buffer, GLYPH_MAX, sb_line, CONSOLE_LINE_OFFSET_LEFT, scrollback_base - (i * line_height));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);

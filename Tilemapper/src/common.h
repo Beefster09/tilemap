@@ -69,12 +69,13 @@ inline T clamp(T a, T lo = 0, T hi = 1) {
 #else
 #define PATH_SEP '/'
 #endif
-#define _STRINGIFY(S) #S
 #define __FILE_BASENAME__ (strrchr(__FILE__, PATH_SEP) + 1)
 #ifdef NDEBUG
 #define ERR_LOG(FMT, ...) do{}while(0)
+#define DBG_LOG(FMT, ...) do{}while(0)
 #else
-#define ERR_LOG(FMT, ...) fprintf(stderr, "[%s (line " _STRINGIFY(__LINE__) " in %s)] " FMT, __func__, __FILE_BASENAME__, __VA_ARGS__)
+#define ERR_LOG(FMT, ...) fprintf(stderr, "[%s (line %d in %s)] " FMT, __func__, __LINE__, __FILE_BASENAME__, __VA_ARGS__)
+#define DBG_LOG(FMT, ...) printf("[%s (line %d in %s)] " FMT, __func__, __LINE__, __FILE_BASENAME__, __VA_ARGS__)
 #endif
 
 /// Allocate some bytes from temp storage

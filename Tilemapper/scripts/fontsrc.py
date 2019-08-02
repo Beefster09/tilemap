@@ -150,6 +150,7 @@ def output_c_header(font_data):
         print(*row, sep=', ', end=',\n', file=out)
     print('};\n', file=out)
 
+    print(f"constexpr int {name}__n_kern_pairs = {len(font_data['kerning'])};", file=out)
     print(f'const KernPair {name}__kerning[] = {{', file=out)
     for (a, b), offset in sorted(font_data['kerning'].items()):
         if offset:
@@ -166,7 +167,7 @@ def output_c_header(font_data):
     print(f"  {{ {', '.join(map(str, font_data['cursor']))} }},", file=out)
     print(f"  {font_data['space']},", file=out)
     print(f"  {font_data['height']},", file=out)
-    print(f"  {name}__kerning, {len(font_data['kerning'])}", file=out)
+    # print(f"  {name}__kerning, {len(font_data['kerning'])}", file=out)
     print( '};', file=out)
 
 if __name__ == '__main__':

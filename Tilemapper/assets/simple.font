@@ -4,7 +4,7 @@ space 4
 height 10
 
 bitmap inline
-    #   0           1           2           3           4               5           6           7           8           9
+    #   0         _ 1 -          2           3           4               5           6           7           8           9
     . X X X .   . X X . .   . X X X .   . X X X .   X . . . X       X X X X X   . X X X .   X X X X X   . X X X .   . X X X .
     X . . . X   . . X . .   X . . . X   X . . . X   X . . . X       X . . . .   X . . . X   . . . . X   X . . . X   X . . . X
     X . . . X   . . X . .   . . . . X   . . . . X   X . . . X       X . . . .   X . . . .   . . . X .   X . . . X   X . . . X
@@ -28,7 +28,7 @@ bitmap inline
     X . X . .   X . . . .   X . . . X   X . . X X   X . . . X       X . . . .   X . X . X   X . . X .   . . . . X   . . X . .
     X . . X .   X . . . .   X . . . X   X . . . X   X . . . X       X . . . .   X . . X .   X . . . X   X . . . X   . . X . .
     X . . . X   X X X X X   X . . . X   X . . . X   . X X X .       X . . . .   . X X . X   X . . . X   . X X X .   . . X . .
-    #   U           V           W           X           Y               Z       . : ! , ;        #           =          ?
+    #   U           V           W           X           Y               Z       . : ! , ;        #        ' " =          ?
     X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . . X . .   . X . . X .   X X X X   . X X X .
     X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       . . . . X   . X X . X   X X X X X X   . . . .   X . . . X
     X . . . X   X . . . X   X . . . X   . X . X .   . X . X .       . . . X .   . . X . .   . X . . X .   . . . .   . . . . X
@@ -44,30 +44,30 @@ bitmap inline
     X . . . X   X . . . X   X . . . .   X . . . X   X X X X .       . X . . .   . X X X X   X . . . X   X . . X .   . X . X .
     X . . X X   X . . . X   X . . . X   X . . . X   X . . . .       . X . . .   . . . . X   X . . . X   X . . X .   . . X . .
     . X X . X   X X X X .   . X X X .   . X X X X   . X X X X       . X . . .   . X X X .   X . . . X   X . . X .   . . . . .
-    #   k           l           m           n           o               p           q           r           s           t
-    X . . . .   X . . . .   . . . . .   . . . . .   . . . . .       X X X X .   . X X X X   . . . . .   . . . X .   . X . . .
-    X . . . .   X . . . .   . . . . .   . . . . .   . . . . .       X . . . X   X . . . X   . . . . .   . X X . .   . X . . .
-    X . . X .   X . . . .   X X . X .   X X X . .   . X X X .       X . . . X   X . . . X   . X X X .   . X X X X   X X X . .
-    X . X . .   X . . . .   X . X . X   X . . X .   X . . . X       X . . . X   X . . . X   X . . . .   X . . . .   . X . . .
-    X X . . .   X . . . .   X . X . X   X . . X .   X . . . X       X X X X .   . X X X X   X . . . .   . X X X .   . X . . .
-    X . X . .   X . . . .   X . X . X   X . . X .   X . . . X       X . . . .   . . . . X   X . . . .   . . . . X   . X . . .
-    X . . X .   X . . . .   X . X . X   X . . X .   . X X X .       X . . . .   . . . . X   X . . . .   X X X X .   . X . . .
-    #   u           v           w           x           y               z         /   \
-    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . X . .   X X X X .   . . X . .   X X X X X
-    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . X . .   X . . . X   . X X X X   . . X . .
-    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . X . X .   X . . . X   X . . . .   . . X . .
-    X . . . X   X . . . X   X . . . X   . X . X .   X . . . X       . . . X .   . X . X .   X X X X .   . X X X .   . . X . .
-    X . . . X   X . . . X   X . X . X   . . X . .   . X X X X       . . X . .   . X . X .   X . . X .   . . . . X   . . X . .
-    X . . . X   . X . X .   X X . X X   . X . X .   . . . . X       . X . . .   X . . . X   X . . . X   X X X X .   . . X . .
-    . X X X .   . . X . .   X . . . X   X . . . X   . X X X .       X X X X X   X . . . X   X . . . X   . . X . .   . . X . .
-    # Placeholder
-    . . . X . . .
-    . . X X X . .
-    . X X . X X .
-    X X . . . X X
-    . X X . X X .
-    . . X X X . .
-    . . . X . . .
+    #   k       l    [ ]        m           n           o               p           q           r           s        + t    |
+    X . . . .   X . X X X   . . . . .   . . . . .   . . . . .       X X X X .   . X X X X   . . . . .   . . . X .   . X . . X
+    X . . . .   X . X . X   . . . . .   . . . . .   . . . . .       X . . . X   X . . . X   . . . . .   . X X . .   . X . . X
+    X . . X .   X . X . X   X X . X .   X X X . .   . X X X .       X . . . X   X . . . X   . X X X .   . X X X X   X X X X X
+    X . X . .   X . X . X   X . X . X   X . . X .   X . . . X       X . . . X   X . . . X   X . . . .   X . . . .   . X . . .
+    X X . . .   X . X . X   X . X . X   X . . X .   X . . . X       X X X X .   . X X X X   X . . . .   . X X X .   . X . . X
+    X . X . .   X . X . X   X . X . X   X . . X .   X . . . X       X . . . .   . . . . X   X . . . .   . . . . X   . X . . X
+    X . . X .   X . X X X   X . X . X   X . . X .   . X X X .       X . . . .   . . . . X   X . . . .   X X X X .   . X . . X
+    #   u           v           w           x           y               z         /   \       ( ^`)         $         {   }
+    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . X . .   . . X . .   . . X . .   . . X . .
+    . . . . .   . . . . .   . . . . .   . . . . .   X . . . X       . . . . .   . . X . .   . X . X .   . X X X X   . X . X .
+    X . . . X   X . . . X   X . . . X   X . . . X   X . . . X       X X X X X   . X . X .   X . . . X   X . . . .   . X . X .
+    X . . . X   X . . . X   X . . . X   . X . X .   X . . . X       . . . X .   . X . X .   X . . . X   . X X X .   X . . . X
+    X . . . X   X . . . X   X . X . X   . . X . .   . X X X X       . . X . .   . X . X .   X . . . X   . . . . X   . X . X .
+    X . . . X   . X . X .   X X . X X   . X . X .   . . . . X       . X . . .   X . . . X   . X . X .   X X X X .   . X . X .
+    . X X X .   . . X . .   X . . . X   X . . . X   . X X X .       X X X X X   X . . . X   . . X . .   . . X . .   . . X . .
+    # Placeholder         @             *          ~           &           %
+    . . . X . . .   . . X X X . .             . X X . . X   . X . . .   . X . . .
+    . . X X X . .   . X . . . X .             X . . X X .   X . X . .   X . X . X
+    . X X . X X .   X . . X . . X   . . X . . .             X . X . X   . X . X .
+    X X . . . X X   X . X . X . X   X X X X X .             . X X X .   . . X . .
+    . X X . X X .   X . . X X X .   . . X . . .             X . . X .   . X . X .
+    . . X X X . .   . X . . . . .   . X . X . .             X . . X .   X . X . X
+    . . . X . . .   . . X X X X X   . X . X . .            . X X . X   . . . X .
 end
 
 array l_widths
@@ -87,34 +87,53 @@ glyphs
     a-z: 5 * (i % 10), 7 * (4 + i // 10), l_widths[i], 7, l_widths[i] + 1, 0, (2 if c in '"gpqy"' else 0)
      j : 41, 28, 3, 9, 2, -2, 0
      s : 40, 37, 5, 5, 6, 0, 2
-    '!': 32, 21, 1, 7, 2
-    ':': 31, 21, 1, 6, 3, 0, 1
-    ';': 33, 21, 2, 8, 3, 0, 0
-    '.': 30, 26, 1, 1, 2, 0, 6
-    ',': 33, 26, 2, 3, 3, 0, 5
-    '#': 35, 21, 6, 7, 7
-    '_': 5, 6, 5, 1, 6, 0, 6
-    '-': 5, 6, 3, 1, 4, 0, 3
-    '=': 41, 21, 4, 4, 5, 0, 2
     "'": 41, 26, 1, 2, 2, 0, 0
+    '!': 32, 21, 1, 7, 2
     '"': 41, 26, 3, 2, 4, 0, 0
-    '?': 45, 21, 5, 7, 6
+    '#': 35, 21, 6, 7, 7
     '$': 40, 42, 5, 7, 6
+    '%': 25, 49, 5, 7, 6
+    '&': 20, 49, 5, 7, 6
+    '(': 35, 42, 3, 7, 4
+    ')': 37, 42, 3, 7, 4
+    '*': 14, 51, 5, 5, 6
+    '+': 44, 35, 5, 5, 6, 0, 1
+    ',': 33, 26, 2, 3, 3, 0, 5
+    '-':  5,  6, 4, 1, 5, 0, 3
+    '.': 30, 26, 1, 1, 2, 0, 6
     '/': 30, 42, 3, 7, 4
-    '\': 32, 42, 3, 7, 4
+    ':': 31, 21, 1, 6, 2, 0, 1
+    ';': 33, 21, 2, 8, 3, 0, 0
     '<': 45, 29, 3, 5, 4, 0, 1
+    '=': 41, 21, 4, 4, 5, 0, 2
     '>': 47, 29, 3, 5, 4, 0, 1
+    '?': 45, 21, 5, 7, 6
+    '@':  7, 49, 7, 7, 8
+    '[':  7, 35, 2, 7, 3
+    '\': 32, 42, 3, 7, 4
+    ']':  8, 35, 2, 7, 3
+    '^': 35, 42, 5, 3, 6
+    '_':  5,  6, 5, 1, 6, 0, 6
+    '`': 37, 42, 2, 2, 3
+    '{': 45, 42, 3, 7, 4
+    '|': 49, 35, 1, 7, 2
+    '}': 47, 42, 3, 7, 4
+    '~': 14, 49, 6, 2, 7, 0, 2
 end
 
 kerning
     Jf : acdegmnopqrsuvwxyz : -1
     T : acdegmnopqrsuvwxyz : -2
-    f : ';' : -1
-    JVYr : '._' : -1
-    JVYr : ','  : -2
+    f : ';@' : -1
+    'JVYr})>' : '._' : -1
+    'JVYr})>' : ','  : -2
     FPTf : '._' : -2
     FPTf : ','  : -3
     BCDGOSUbcopuv : ',;' : -1
+    '{(<' : '{(<' : -1
+    '})>' : '})>' : -1
+    '/' : '/' : -1
+    '\\' : '\\' : -1
     gjqy : j : +2
     _ : _ : -1
 end

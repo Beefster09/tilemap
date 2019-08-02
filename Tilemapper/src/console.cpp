@@ -17,6 +17,13 @@ static char key_to_char(int key) {
 	if (base_key >= GLFW_KEY_KP_0 && base_key <= GLFW_KEY_KP_9) {
 		return base_key - GLFW_KEY_KP_0 + '0';
 	}
+	switch (base_key) {
+	case GLFW_KEY_KP_ADD:      return '+';
+	case GLFW_KEY_KP_SUBTRACT: return '-';
+	case GLFW_KEY_KP_MULTIPLY: return '*';
+	case GLFW_KEY_KP_DIVIDE:   return '/';
+	case GLFW_KEY_KP_DECIMAL:  return '.';
+	}
 	if (base_key > 127) return 0;
 	if (key & MOD_SHIFT) {
 		switch (base_key) {
@@ -30,7 +37,7 @@ static char key_to_char(int key) {
 		case '6': return '^';
 		case '7': return '&';
 		case '8': return '*';
-		case '9': return ')';
+		case '9': return '(';
 		case '-': return '_';
 		case '=': return '+';
 		case '[': return '{';
@@ -514,7 +521,7 @@ void init_console() {
 }
 
 int console_type_key(int keycode) {
-	if (keycode == GLFW_KEY_ENTER) {
+	if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER) {
 		std::string response;
 		auto status = console_submit_command(response);
 		// TODO: print some sort of response in a command history
