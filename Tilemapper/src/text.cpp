@@ -73,44 +73,67 @@ static void kern_table_insert(KerningData& kerning, KernPair pair) {
 	auto index = hash & kerning.mask;
 	DBG_LOG("Kerning Hash %lc %lc ==> %016llx (index %lld)", pair.left, pair.right, hash, index);
 	u16 probe_count = 1;
-	while (kerning.table[index].probe_count > 0) {
-		if (kerning.table[index].left == pair.left && kerning.table[index].right == pair.right) {
-			kerning.table[index].kern_offset = pair.kern_offset;
-			return;
-		}
-		DBG_LOG(
-			"Hash collision: %lc %lc vs %lc %lc on probe #%hd (@%d, vs. #%hd)",
-			pair.left, pair.right,
-			kerning.table[index].left, kerning.table[index].right,
-			probe_count,
-			index,
-			kerning.table[index].probe_count
-		);
-
-		if (probe_count > kerning.table[index].probe_count) {
-			// steal this table slot
-			KernTableEntry entry = {
-				(u32) pair.left, (u32) pair.right,
+	bool stole;
+	do {
+		stole = false;
+		u16 richest = UINT16_MAX;
+		u64 richest_index = index;
+		u16 richest_my_probe_count = probe_count;
+		while (kerning.table[index].probe_count > 0) {
+			auto& cur = kerning.table[index];
+			if (cur.left == pair.left && cur.right == pair.right) {
+				cur.kern_offset = pair.kern_offset;
+				return;
+			}
+			DBG_LOG(
+				"Hash collision: %lc %lc vs %lc %lc on probe #%hd (@%d, vs. #%hd)",
+				pair.left, pair.right,
+				cur.left, cur.right,
 				probe_count,
-				pair.kern_offset,
-			};
-			std::swap(entry, kerning.table[index]);
-			// continue on with the victim
-			pair = {
-				entry.left, entry.right,
-				entry.kern_offset
-			};
-			probe_count = entry.probe_count;
-		}
+				index,
+				cur.probe_count
+			);
 
-		index += PROBE_MULT * probe_count + PROBE_SKIP;
-		index &= kerning.mask;
-		probe_count += 1;
+			if (cur.probe_count < richest) { // remember the richest guy to (maybe) steal from
+				richest = cur.probe_count;
+				richest_index = index;
+				richest_my_probe_count = probe_count;
+			}
 
-		if (probe_count > kerning.max_probe_count) {
-			kerning.max_probe_count = probe_count;
+			if (probe_count > richest) {
+				DBG_LOG(
+					"Stealing index %d from %lc %lc for %lc %lc",
+					richest_index,
+					kerning.table[richest_index].left, kerning.table[richest_index].right,
+					pair.left, pair.right
+				);
+				// steal from the rich
+				KernTableEntry entry = {
+					(u32) pair.left, (u32) pair.right,
+					richest_my_probe_count,
+					pair.kern_offset,
+				};
+				std::swap(entry, kerning.table[richest_index]);
+				// continue on with the victim
+				pair = {
+					entry.left, entry.right,
+					entry.kern_offset
+				};
+				probe_count = entry.probe_count;
+				index = richest_index;
+				stole = true;
+			}
+
+			index += PROBE_MULT * probe_count + PROBE_SKIP;
+			index &= kerning.mask;
+			probe_count += 1;
+
+			if (probe_count > kerning.max_probe_count) {
+				kerning.max_probe_count = probe_count;
+			}
+			if (stole) break;
 		}
-	}
+	} while (stole);
 	kerning.table[index] = {
 		(u32) pair.left, (u32) pair.right,
 		probe_count,
