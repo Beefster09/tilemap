@@ -16,10 +16,10 @@ constexpr int TAB_LENGTH = 8; // Number of spaces that make up a tab
 HexColor cursor_color = 0xccccccff;
 
 constexpr u64 LARGE_PRIME = 541894198537;
-constexpr int LEFT_PRIME  = 926153;
-constexpr int RIGHT_PRIME = 1698461;
+constexpr u64 LEFT_PRIME  = 926153;
+constexpr u64 RIGHT_PRIME = 1698461;
 static u64 hash_kern_pair(int left, int right) {
-	u64 pair = ((left * LEFT_PRIME) << 20) + (right * RIGHT_PRIME);
+	u64 pair = (((u64)left * LEFT_PRIME) << 20ull) + ((u64)right * RIGHT_PRIME);
 	// Xorshift64
 	pair ^= pair << 13;
 	pair ^= pair >> 7;
@@ -29,16 +29,14 @@ static u64 hash_kern_pair(int left, int right) {
 }
 
 struct KernPair {
-	int left, right;
-	int kern_offset;
+	char32_t left, right;
+	i32 kern_offset;
 };
 
 struct KernTableEntry {
-	u32 left, right;
+	char32_t left, right;
+	u32 probe_count;
 	i32 kern_offset;
-	u16 probe_count;
-	bool occupied;
-	u8 _padding_;
 };
 
 struct KerningData {
@@ -67,26 +65,57 @@ struct Font {
 	// std::unordered_map<u32, GlyphData> other_glyphs;
 };
 
-static void kern_table_insert(KerningData& kerning, KernPair pair) { // Uses robin hood probing
+constexpr int PROBE_MULT = 1;
+constexpr int PROBE_SKIP = 3;
+
+static void kern_table_insert(KerningData& kerning, KernPair pair) {
 	auto hash = hash_kern_pair(pair.left, pair.right);
 	auto index = hash & kerning.mask;
-	DBG_LOG("Kerning Hash ('%c':'%c') ==> %016llx (index %lld)\n", pair.left, pair.right, hash, index);
-	u16 probe_count = 0;
-	while (kerning.table[index].occupied) {
-		probe_count += 1;
-		index += probe_count;
+	DBG_LOG("Kerning Hash %lc %lc ==> %016llx (index %lld)", pair.left, pair.right, hash, index);
+	u16 probe_count = 1;
+	while (kerning.table[index].probe_count > 0) {
+		if (kerning.table[index].left == pair.left && kerning.table[index].right == pair.right) {
+			kerning.table[index].kern_offset = pair.kern_offset;
+			return;
+		}
+		DBG_LOG(
+			"Hash collision: %lc %lc vs %lc %lc on probe #%hd (@%d, vs. #%hd)",
+			pair.left, pair.right,
+			kerning.table[index].left, kerning.table[index].right,
+			probe_count,
+			index,
+			kerning.table[index].probe_count
+		);
+
+		if (probe_count > kerning.table[index].probe_count) {
+			// steal this table slot
+			KernTableEntry entry = {
+				(u32) pair.left, (u32) pair.right,
+				probe_count,
+				pair.kern_offset,
+			};
+			std::swap(entry, kerning.table[index]);
+			// continue on with the victim
+			pair = {
+				entry.left, entry.right,
+				entry.kern_offset
+			};
+			probe_count = entry.probe_count;
+		}
+
+		index += PROBE_MULT * probe_count + PROBE_SKIP;
 		index &= kerning.mask;
+		probe_count += 1;
+
+		if (probe_count > kerning.max_probe_count) {
+			kerning.max_probe_count = probe_count;
+		}
 	}
-	// TODO maybe: Robin Hood hashing
 	kerning.table[index] = {
 		(u32) pair.left, (u32) pair.right,
-		pair.kern_offset,
 		probe_count,
-		true
+		pair.kern_offset,
 	};
-	if (probe_count > kerning.max_probe_count) {
-		kerning.max_probe_count = probe_count;
-	}
 }
 
 static KerningData create_kern_table(const KernPair* const kern_pairs, const unsigned int n_kern_pairs) {
@@ -98,19 +127,29 @@ static KerningData create_kern_table(const KernPair* const kern_pairs, const uns
 	for (int i = 0; i < n_kern_pairs; i++) {
 		kern_table_insert(out, kern_pairs[i]);
 	}
-	DBG_LOG("Kerning table max probe = %d\n\n", out.max_probe_count);
+	DBG_LOG("Kerning table max probe = %d", out.max_probe_count);
+#ifndef NDEBUG
+	printf("Kerning table probe count distribution:\n");
+	for (int base = 0; base < capacity; base += 16) {
+		printf("   ");
+		for (int i = base; i < base + 16; i++) {
+			printf(" %d", out.table[i].probe_count);
+		}
+		printf("\n");
+	}
+	printf("\n");
+#endif
 	return out;
 }
 
-static int get_kerning_offset(const KerningData& const kerning, int left, int right) {
+static int get_kerning_offset(const KerningData& const kerning, char32_t left, char32_t right) {
 	if (left <= ' ' || right <= ' ') return 0;
-	auto hash = hash_kern_pair(left, right);
-	auto index = hash & kerning.mask;
+	auto index = hash_kern_pair(left, right) & kerning.mask;
 	for (int probe_count = 1; probe_count <= kerning.max_probe_count; probe_count++) {
 		auto& entry = kerning.table[index];
-		if (!entry.occupied) return 0;
+		if (entry.probe_count == 0) return 0;
 		if (entry.left == left && entry.right == right) return entry.kern_offset;
-		index += probe_count;
+		index += PROBE_MULT * probe_count + PROBE_SKIP;
 		index &= kerning.mask;
 	}
 	return 0;
