@@ -19,13 +19,29 @@ constexpr u64 LARGE_PRIME = 541894198537;
 constexpr u64 LEFT_PRIME  = 926153;
 constexpr u64 RIGHT_PRIME = 1698461;
 static u64 hash_kern_pair(int left, int right) {
-	u64 pair = (((u64)left * LEFT_PRIME) << 20ull) + ((u64)right * RIGHT_PRIME);
+	u64 pair = (((u64)left * LEFT_PRIME) << 32ull) + ((u64)right * RIGHT_PRIME);
 	// Xorshift64
 	pair ^= pair << 13;
 	pair ^= pair >> 7;
 	pair ^= pair << 17;
-	// The high bits are better, but let's multiply by a large prime for good measure
+	// The high bits are better on xorshift, so we'll take those and multiply them by a prime number to increase entropy
 	return (pair >> 32) * LARGE_PRIME;
+}
+
+//constexpr int UNICODE_SIZE = 1 << 20;
+void kern_hash_func_analysis() {
+	u64 bits_set_total = 0;
+	for (int left = 0; left < 65536; left++) {
+		for (int right = 0; right < 65536; right++) {
+			auto hash = hash_kern_pair(left, right);
+			bits_set_total += __popcnt64(hash);
+		}
+		if (left % 2048 == 0) {
+			printf("Completed %d codepoints (left side).\n", left);
+		}
+	}
+	double avg = ((double)bits_set_total) / (65536.0 * 65536.0);
+	printf("Average number of bits set for hashes in Unicode BMP: %f\n", avg);
 }
 
 struct KernPair {
@@ -65,8 +81,8 @@ struct Font {
 	// std::unordered_map<u32, GlyphData> other_glyphs;
 };
 
-constexpr int PROBE_MULT = 1;
-constexpr int PROBE_SKIP = 3;
+constexpr int PROBE_MULT = 3;
+constexpr int PROBE_SKIP = 7;
 
 static void kern_table_insert(KerningData& kerning, KernPair pair) {
 	auto hash = hash_kern_pair(pair.left, pair.right);
@@ -181,16 +197,16 @@ static int get_kerning_offset(const KerningData& const kerning, char32_t left, c
 static inline bool handle_color_code(const char* const fulltext, const char* const c, HexColor* color, const char** end) {
 	*end = strchr(c, ']');
 	if (!*end) {
-		ERR_LOG("TEXT ERROR: Set Color Control Code is not followed with ']'.\n  From: \"%s\"\n", fulltext);
+		ERR_LOG("TEXT ERROR: Set Color Control Code is not followed with ']'.\n  From: \"%s\"", fulltext);
 		return false;
 	}
 	switch (parse_hex_color(c, nullptr, color)) {
 	case OK: return true;
 	case INVALID_CHARS:
-		ERR_LOG("TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"\n", fulltext);
+		ERR_LOG("TEXT ERROR: non-hex-digit character found in Set Color Control Code.\n  From: \"%s\"", fulltext);
 		return false;
 	case INVALID_LEN:
-		ERR_LOG("TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"\n", fulltext);
+		ERR_LOG("TEXT ERROR: Set Color Control Code has an unsupported number of hex digits.\n  From: \"%s\"", fulltext);
 		return false;
 	default:
 		ERR_LOG("Unkown Color Control Parse Error in \"%s\".", fulltext);
@@ -261,10 +277,10 @@ int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_siz
 				break;
 			}
 			case 0:
-				ERR_LOG("Found '#' at end of string '%s'\n", text);
+				ERR_LOG("Found '#' at end of string '%s'", text);
 				goto handle_ascii;
 			default:
-				ERR_LOG("Unsupported control code #%c in string '%s'\n", c[1], text);
+				ERR_LOG("Unsupported control code #%c in string '%s'", c[1], text);
 				return -1;
 			}
 		}
@@ -272,7 +288,7 @@ int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_siz
 			handle_ascii:
 
 			if (len >= buf_size) {
-				ERR_LOG("WARNING: Unable to render the text \"%s\" with only %zd glyphs.\n", text, buf_size);
+				ERR_LOG("WARNING: Unable to render the text \"%s\" with only %zd glyphs.", text, buf_size);
 				return len;
 			}
 
@@ -328,5 +344,5 @@ void init_simple_font() {
 	simple_font.glyph_atlas = new Texture(tex_handle, GL_TEXTURE_RECTANGLE);
 	simple_font.kerning = create_kern_table(simple_font__kerning, simple_font__n_kern_pairs);
 
-	// do a thing
+	//kern_hash_func_analysis();
 }

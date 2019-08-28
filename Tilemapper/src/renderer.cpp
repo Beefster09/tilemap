@@ -75,9 +75,6 @@ float scaling_sharpness = 2.f;
 #define __S_SL EXPAND(__S) ## _slots
 #define __S_SH EXPAND(__S) ## _shader
 #define __SLOT(VAR) (__S_SL.VAR) = (__S_SH).getSlot(#VAR)
-#ifdef TEXT // Sometimes this is defined. I don't need it. Fuck that macro.
-#undef TEXT
-#endif
 Renderer::Renderer(GLFWwindow* window, int width, int height):
 	window(window),
 	tile_shader(__SHADER(TILECHUNK)),

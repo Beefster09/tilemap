@@ -6,6 +6,9 @@
 #include "text.h"
 #include "console.h"
 
+#define PROMPT_PREFIX "$ "
+#define RESPONSE_PREFIX "==> "
+
 constexpr int MOD_SHIFT = GLFW_MOD_SHIFT   << GLFW_TO_CONSOLE_SHIFT;
 constexpr int MOD_ALT   = GLFW_MOD_ALT     << GLFW_TO_CONSOLE_SHIFT;
 constexpr int MOD_CTRL  = GLFW_MOD_CONTROL << GLFW_TO_CONSOLE_SHIFT;
@@ -188,7 +191,12 @@ struct ConsoleFunc {
 
 struct ConsoleScrollback {
 	std::string contents;
-	enum { COMMAND, RESPONSE, LOG } type = COMMAND;
+	enum { 
+		BLANK_LINE, 
+		COMMAND, 
+		RESPONSE, 
+		LOG 
+	} type = COMMAND;
 	CommandStatus resp_status = CMD_OK;
 };
 
@@ -439,6 +447,11 @@ static CommandStatus console_submit_command(std::string& response) {
 		response = status_string(status);
 		return status;
 	}
+	else if (strcmp(cmd, "clear") == 0) {
+		console_scrollback.clear();
+		response = "Console Scrollback Cleared.";
+		return CMD_OK;
+	}
 	else if (strcmp(cmd, "set") == 0) {
 		auto var = lexer.emit_token();
 		auto val = lexer.emit_token();
@@ -518,19 +531,25 @@ static void console_history_scroll(int offset) {
 
 void init_console() {
 	stb_textedit_initialize_state(&console_state, true);
+	console_scrollback.push_back({ "EXAMPLE LOG MESSAGE", ConsoleScrollback::LOG });
 }
 
 int console_type_key(int keycode) {
 	if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER) {
-		std::string response;
-		auto status = console_submit_command(response);
-		// TODO: print some sort of response in a command history
-		console_scrollback.push_back({console_line, ConsoleScrollback::COMMAND});
-		console_scrollback.push_back({response, ConsoleScrollback::RESPONSE, status});
-		console_history.push_back(console_line);
-		history_pos = 0;
-		console_line.clear();
-		stb_textedit_initialize_state(&console_state, true);
+		if (console_line.size() > 0) {
+			std::string response;
+			auto status = console_submit_command(response);
+			// TODO: print some sort of response in a command history
+			console_scrollback.push_back({console_line, ConsoleScrollback::COMMAND});
+			console_scrollback.push_back({response, ConsoleScrollback::RESPONSE, status});
+			console_history.push_back(console_line);
+			history_pos = 0;
+			console_line.clear();
+			stb_textedit_initialize_state(&console_state, true);
+		}
+		else {
+			console_scrollback.push_back({ "", ConsoleScrollback::BLANK_LINE });
+		}
 	}
 	else if (keycode == GLFW_KEY_UP) {
 		console_history_scroll(-1);
@@ -567,10 +586,11 @@ const char* get_console_line(bool show_cursor = true) {
 	char* buf = temp_alloc(char, capacity);
 	int i = 0;
 	if (show_cursor) {
-		i = snprintf(buf, capacity, "\x1%d\x2", console_state.cursor + 2);
+		i = snprintf(buf, capacity, "\x1%d\x2" PROMPT_PREFIX, console_state.cursor + 2);
 	}
-	buf[i++] = '>';
-	buf[i++] = ' ';
+	else {
+		i = snprintf(buf, capacity, PROMPT_PREFIX);
+	}
 	escape_hash(buf + i, console_line, capacity - i);
 	return buf;
 }
@@ -584,14 +604,16 @@ const char* get_console_scrollback_line(int line_offset) {
 	char* buf = temp_alloc(char, capacity);
 	switch (sb_line.type) {
 	case ConsoleScrollback::COMMAND: {
-		int i = snprintf(buf, capacity, "#c[888]> ");
-		escape_hash(buf + i, sb_line.contents.c_str(), capacity - i);
+		int i = snprintf(buf, capacity, "#c[888]" PROMPT_PREFIX);
+		escape_hash(buf + i, sb_line.contents, capacity - i);
 		return buf;
 	}
 	case ConsoleScrollback::RESPONSE: {
-		int i = snprintf(buf, capacity, "#c[888]---> #c[%06x]", status_color(sb_line.resp_status));
-		escape_hash(buf + i, sb_line.contents.c_str(), capacity - i);
+		int i = snprintf(buf, capacity, "#c[888]" RESPONSE_PREFIX "#c[%06x]", status_color(sb_line.resp_status));
+		escape_hash(buf + i, sb_line.contents, capacity - i);
 		return buf;
 	}
+	case ConsoleScrollback::BLANK_LINE: return "";
+	default: return "#c[a70]<<< NOT IMPLEMENTED >>>";
 	}
 }
