@@ -159,6 +159,8 @@ def output_c_header(font_data):
 
     print(f'Font {name} = {{', file=out)
     print( '  nullptr,', file=out)
+    print( '  nullptr,', file=out)
+    print( '  -1,', file=out)
     print( '  {', file=out)
     for ascii_glyph in range(0x21, 0x7f):
         c = chr(ascii_glyph)

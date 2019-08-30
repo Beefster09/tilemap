@@ -7,7 +7,7 @@ struct Font;
 
 struct GlyphRenderData {
 	float x, y;
-	i32 src_x, src_y, src_w, src_h;
+	u32 glyph_id;
 	u32 rgba;
 };
 
@@ -19,6 +19,7 @@ struct FontDims {
 int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_size, const char* text, float x, float y);
 FontDims get_font_dimensions(const Font& font);
 int bind_font_glyph_atlas(Font& font, int slot = 0);
+int bind_font_glyph_table(Font& font, int slot = 0);
 
 void init_simple_font();
 

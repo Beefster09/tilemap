@@ -140,11 +140,11 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	sprite_attrs = (SpriteAttributes*)calloc(SPRITE_MAX, sizeof(SpriteAttributes));
 	//glGenBuffers(1, &sprite_vbo); // done earlier
 	glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * SPRITE_MAX, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
+	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * SPRITE_MAX, sprite_attrs, GL_STREAM_DRAW); // reserve GPU memory
 
 	//glGenBuffers(1, &text_vbo); // done earlier
 	glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(GlyphRenderData) * GLYPH_MAX, sprite_attrs, GL_DYNAMIC_DRAW); // reserve GPU memory
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GlyphRenderData) * GLYPH_MAX, sprite_attrs, GL_STREAM_DRAW); // reserve GPU memory
 
 	temp_string_storage = (char*)malloc(STRING_STORAGE_SIZE);
 	string_storage_next = temp_string_storage;
@@ -298,7 +298,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 
 		glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
 
-		glVertexAttribIPointer(1, 4, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, src_x));
+		glVertexAttribIPointer(1, 1, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, glyph_id));
 		glEnableVertexAttribArray(1);
 		glVertexAttribDivisor(1, 1);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, x));
@@ -314,6 +314,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		for (auto it = print_later_ws_start; it < print_later_ws; it++) {
 			int n_glyphs = print_glyphs(it->font, glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
 			text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(*it->font, 0));
+			text_shader.set(text_slots.glyph_bounds, bind_font_glyph_table(*it->font, 1));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
@@ -325,6 +326,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		for (auto it = print_later_ss_start; it < print_later_ss; it++) {
 			int n_glyphs = print_glyphs(it->font, glyph_buffer, GLYPH_MAX, it->text, it->x, it->y);
 			text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(*it->font, 0));
+			text_shader.set(text_slots.glyph_bounds, bind_font_glyph_table(*it->font, 1));
 
 			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
 			glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, n_glyphs);
@@ -343,6 +345,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 			text_shader.setCamera(ui_camera);
 		}
 		text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(simple_font, 0));
+		text_shader.set(text_slots.glyph_bounds, bind_font_glyph_table(simple_font, 1));
 		//text_shader.set(text_slots.layer, 500.f);
 
 		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GlyphRenderData) * n_glyphs, glyph_buffer);
@@ -362,13 +365,14 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		//text_shader.set(text_slots.layer, 500.f);
 		text_shader.setCamera(ui_camera);
 		text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(simple_font, 0));
+		text_shader.set(text_slots.glyph_bounds, bind_font_glyph_table(simple_font, 1));
 
 		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
-		glVertexAttribIPointer(1, 4, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, src_x));
+		glVertexAttribIPointer(1, 1, GL_INT, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, glyph_id));
 		glEnableVertexAttribArray(1);
 		glVertexAttribDivisor(1, 1);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(GlyphRenderData), (void*)offsetof(GlyphRenderData, x));

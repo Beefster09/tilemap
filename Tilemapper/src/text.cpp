@@ -10,7 +10,10 @@
 #include <intrin.h>
 
 constexpr int ASCII_START = 33;
+constexpr int ASCII_END = 127; // exclusive range
+constexpr int ASCII_SIZE = ASCII_END - ASCII_START;
 constexpr int TAB_LENGTH = 8; // Number of spaces that make up a tab
+constexpr int CURSOR_GLYPH_ID = 94;
 
 // @console
 HexColor cursor_color = 0xccccccff;
@@ -18,14 +21,17 @@ HexColor cursor_color = 0xccccccff;
 constexpr u64 LARGE_PRIME = 541894198537;
 constexpr u64 LEFT_PRIME  = 926153;
 constexpr u64 RIGHT_PRIME = 1698461;
+constexpr u64 INVERSE_PHI64 = 11400714819323198485;
+constexpr u64 ALLBITS64 = 0xFFFFffffFFFFffff;
+
 static u64 hash_kern_pair(int left, int right) {
 	u64 pair = (((u64)left * LEFT_PRIME) << 32ull) + ((u64)right * RIGHT_PRIME);
 	// Xorshift64
 	pair ^= pair << 13;
 	pair ^= pair >> 7;
 	pair ^= pair << 17;
-	// The high bits are better on xorshift, so we'll take those and multiply them by a prime number to increase entropy
-	return (pair >> 32) * LARGE_PRIME;
+	// The high bits are better on xorshift, so we'll reorder those to the front
+	return _rotl64(pair, 32);
 }
 
 //constexpr int UNICODE_SIZE = 1 << 20;
@@ -58,7 +64,7 @@ struct KernTableEntry {
 struct KerningData {
 	KernTableEntry* table;
 	u32 capacity;
-	u32 mask;
+	u32 shift;
 	u32 max_probe_count;
 };
 
@@ -70,7 +76,9 @@ struct GlyphData {
 
 struct Font {
 	Texture* glyph_atlas;
-	GlyphData ascii_glyphs[94]; // glyphs from 0x21-0x7E
+	Texture* glyph_table;
+	GLuint glyph_table_buffer;
+	GlyphData ascii_glyphs[ASCII_SIZE]; // glyphs from 0x21-0x7E
 	struct {
 		i32 src_x, src_y, src_w, src_h;
 		i32 offset_x = 0, offset_y = 0;
@@ -86,7 +94,8 @@ constexpr int PROBE_SKIP = 7;
 
 static void kern_table_insert(KerningData& kerning, KernPair pair) {
 	auto hash = hash_kern_pair(pair.left, pair.right);
-	auto index = hash & kerning.mask;
+	auto index = (hash * INVERSE_PHI64) >> kerning.shift;
+	auto mask = ALLBITS64 >> kerning.shift;
 	DBG_LOG("Kerning Hash %lc %lc ==> %016llx (index %lld)", pair.left, pair.right, hash, index);
 	u16 probe_count = 1;
 	bool stole;
@@ -141,7 +150,7 @@ static void kern_table_insert(KerningData& kerning, KernPair pair) {
 			}
 
 			index += PROBE_MULT * probe_count + PROBE_SKIP;
-			index &= kerning.mask;
+			index &= mask;
 			probe_count += 1;
 
 			if (probe_count > kerning.max_probe_count) {
@@ -162,7 +171,7 @@ static KerningData create_kern_table(const KernPair* const kern_pairs, const uns
 	u32 capacity = 1 << (32 - __lzcnt(n_kern_pairs * 10 / 8)); // TODO: make this more portable
 	u32 mask = capacity - 1;
 	auto table_data = (KernTableEntry*)calloc(capacity, sizeof(KernTableEntry));
-	KerningData out = { table_data, capacity, mask, 0 };
+	KerningData out = { table_data, capacity, __lzcnt64((u64) mask), 0 };
 	for (int i = 0; i < n_kern_pairs; i++) {
 		kern_table_insert(out, kern_pairs[i]);
 	}
@@ -183,13 +192,14 @@ static KerningData create_kern_table(const KernPair* const kern_pairs, const uns
 
 static int get_kerning_offset(const KerningData& const kerning, char32_t left, char32_t right) {
 	if (left <= ' ' || right <= ' ') return 0;
-	auto index = hash_kern_pair(left, right) & kerning.mask;
+	auto index = (hash_kern_pair(left, right) * INVERSE_PHI64) >> kerning.shift;
+	auto mask = ALLBITS64 >> kerning.shift;
 	for (int probe_count = 1; probe_count <= kerning.max_probe_count; probe_count++) {
 		auto& entry = kerning.table[index];
 		if (entry.probe_count == 0) return 0;
 		if (entry.left == left && entry.right == right) return entry.kern_offset;
 		index += PROBE_MULT * probe_count + PROBE_SKIP;
-		index &= kerning.mask;
+		index &= mask;
 	}
 	return 0;
 }
@@ -284,7 +294,7 @@ int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_siz
 				return -1;
 			}
 		}
-		else if (*c >= ASCII_START && *c < 127) {
+		else if (*c >= ASCII_START && *c < ASCII_END) {
 			handle_ascii:
 
 			if (len >= buf_size) {
@@ -292,10 +302,12 @@ int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_siz
 				return len;
 			}
 
-			auto& glyph = font->ascii_glyphs[*c - ASCII_START];
+			u32 glyph_id = *c - ASCII_START;
+			auto& glyph = font->ascii_glyphs[glyph_id];
 			buffer[len++] = {
-				x + x_offset + glyph.offset_x, y + y_offset + glyph.offset_y,
-				glyph.src_x, glyph.src_y, glyph.src_w, glyph.src_h,
+				x + x_offset + glyph.offset_x,
+				y + y_offset + glyph.offset_y,
+				glyph_id,
 				rgba
 			};
 			x_offset += glyph.advance + get_kerning_offset(font->kerning, c[0], c[1]);
@@ -311,8 +323,9 @@ int print_glyphs(const Font* font, GlyphRenderData* const buffer, size_t buf_siz
 			cursor_y = y_offset;
 		}
 		buffer[len++] = {
-			x + cursor_x + font->cursor.offset_x, y + cursor_y + font->cursor.offset_y,
-			font->cursor.src_x, font->cursor.src_y, font->cursor.src_w, font->cursor.src_h,
+			x + cursor_x + font->cursor.offset_x,
+			y + cursor_y + font->cursor.offset_y,
+			CURSOR_GLYPH_ID,
 			cursor_color
 		};
 	}
@@ -327,12 +340,18 @@ int bind_font_glyph_atlas(Font& font, int slot) {
 	return font.glyph_atlas->bind(slot);
 }
 
+int bind_font_glyph_table(Font& font, int slot) {
+	return font.glyph_table->bind(slot);
+}
+
 #include "generated/simple_font.h"
 
 void init_simple_font() {
-	GLuint tex_handle;
-	glGenTextures(1, &tex_handle);
-	glBindTexture(GL_TEXTURE_RECTANGLE, tex_handle);
+	GLuint tex_handles[2];
+	glGenTextures(2, tex_handles);
+	auto& atlas = tex_handles[0];
+	auto& table = tex_handles[1];
+	glBindTexture(GL_TEXTURE_RECTANGLE, atlas);
 
 	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8UI, simple_font__bitmap_width, simple_font__bitmap_height, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, simple_font__bitmap);
 
@@ -341,7 +360,31 @@ void init_simple_font() {
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	simple_font.glyph_atlas = new Texture(tex_handle, GL_TEXTURE_RECTANGLE);
+	u32 glyph_bounds[(ASCII_SIZE + 1) * 4];
+	for (int i = 0; i < ASCII_SIZE; i++) {
+#define SET_GLYPH_ATTR(NAME, OFFSET) glyph_bounds[4 * i + OFFSET] = simple_font.ascii_glyphs[i].src_ ## NAME;
+		SET_GLYPH_ATTR(x, 0);
+		SET_GLYPH_ATTR(y, 1);
+		SET_GLYPH_ATTR(w, 2);
+		SET_GLYPH_ATTR(h, 3);
+#undef SET_GLYPH_ATTR
+	}
+	glyph_bounds[4 * CURSOR_GLYPH_ID + 0] = simple_font.cursor.src_x;
+	glyph_bounds[4 * CURSOR_GLYPH_ID + 1] = simple_font.cursor.src_y;
+	glyph_bounds[4 * CURSOR_GLYPH_ID + 2] = simple_font.cursor.src_w;
+	glyph_bounds[4 * CURSOR_GLYPH_ID + 3] = simple_font.cursor.src_h;
+
+	GLuint table_buffer;
+	glGenBuffers(1, &table_buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, table_buffer);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(glyph_bounds), (void*)glyph_bounds, GL_STATIC_DRAW);
+
+	glBindTexture(GL_TEXTURE_BUFFER, table);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, table_buffer);
+
+	simple_font.glyph_atlas = new Texture(atlas, GL_TEXTURE_RECTANGLE);
+	simple_font.glyph_table = new Texture(table, GL_TEXTURE_BUFFER);
+	simple_font.glyph_table_buffer = table_buffer;
 	simple_font.kerning = create_kern_table(simple_font__kerning, simple_font__n_kern_pairs);
 
 	//kern_hash_func_analysis();
