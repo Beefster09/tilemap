@@ -337,11 +337,11 @@ FontDims get_font_dimensions(const Font& font) {
 	return { font.space_width, font.line_height };
 }
 int bind_font_glyph_atlas(Font& font, int slot) {
-	return font.glyph_atlas->bind(slot);
+	return bind(font.glyph_atlas, slot);
 }
 
 int bind_font_glyph_table(Font& font, int slot) {
-	return font.glyph_table->bind(slot);
+	return bind(font.glyph_table, slot);
 }
 
 #include "generated/simple_font.h"
@@ -382,8 +382,8 @@ void init_simple_font() {
 	glBindTexture(GL_TEXTURE_BUFFER, table);
 	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, table_buffer);
 
-	simple_font.glyph_atlas = new Texture(atlas, GL_TEXTURE_RECTANGLE);
-	simple_font.glyph_table = new Texture(table, GL_TEXTURE_BUFFER);
+	simple_font.glyph_atlas = make_texture(atlas, GL_TEXTURE_RECTANGLE);
+	simple_font.glyph_table = make_texture(table, GL_TEXTURE_BUFFER);
 	simple_font.glyph_table_buffer = table_buffer;
 	simple_font.kerning = create_kern_table(simple_font__kerning, simple_font__n_kern_pairs);
 

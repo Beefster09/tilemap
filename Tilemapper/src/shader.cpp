@@ -176,12 +176,6 @@ void Shader::set(int slot, const glm::mat4& mat) const {
 	glUniformMatrix4fv(slot, 1, GL_FALSE, &mat[0][0]);
 }
 
-void Shader::set(int slot, Texture* tex) const {
-	if (slot < 0) return;
-	assert(activeProgram == shaderProgram);
-	glUniform1i(slot, tex->bind());
-}
-
 void Shader::setCamera(const glm::mat4& camera) const {
 	if (cameraSlot < 0) return;
 	assert(activeProgram == shaderProgram);

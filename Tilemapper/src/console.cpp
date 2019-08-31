@@ -1,4 +1,5 @@
 #include <string>
+#include <vector>
 #include <cassert>
 
 #include <glfw3.h>

@@ -43,7 +43,6 @@ public:
 	void set(int slot, glm::vec3 vec) const;
 	void set(int slot, glm::vec4 vec) const;
 	void set(int slot, const glm::mat4& mat) const;
-	void set(int slot, Texture* tex) const;
 
 	void setCamera(const glm::mat4& mat) const;
 	void setTransform(const glm::mat4& mat) const;

@@ -104,11 +104,11 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
 
-	glGenBuffers(3, &tile_vbo);  // Should also create sprite_vbo and text_vbo
-	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+	glGenBuffers(3, &rect_vbo);  // Should also create sprite_vbo and text_vbo
+	glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(tile_vertices), tile_vertices, GL_STATIC_DRAW);
 
-	palette = new Palette({
+	palette = make_palette({
 		{
 			{30, 40, 50},
 			{50, 70, 90},
@@ -135,7 +135,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
-	framebuffer = new Texture(framebuf);
+	framebuffer = make_texture(framebuf, GL_TEXTURE_2D);
 
 	sprite_attrs = (SpriteAttributes*)calloc(SPRITE_MAX, sizeof(SpriteAttributes));
 	//glGenBuffers(1, &sprite_vbo); // done earlier
@@ -194,10 +194,10 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 			|| ci < clen && chunks[chunk_order[ci]].layer <= sprite_attrs[si].layer) { // or this chunk is on the same layer or below as the next sprite
 			if (current_shader != TILECHUNK) {
 				tile_shader.use();
-				tile_shader.set(tile_slots.palette, palette->bind(1));
+				tile_shader.set(tile_slots.palette, bind(palette, 1));
 				tile_shader.setCamera(world_camera);
 
-				glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+				glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 				glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 				glEnableVertexAttribArray(0);
 				glDisableVertexAttribArray(3);
@@ -207,7 +207,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 			}
 			auto& chunk = chunks[chunk_order[ci]];
 
-			tile_shader.set(tile_slots.tileset, chunk.chunk->tileset->bind(0));
+			tile_shader.set(tile_slots.tileset, bind(chunk.chunk->tileset, 0));
 			tile_shader.set(tile_slots.chunk_size, (int)chunk.chunk->width);
 			tile_shader.set(tile_slots.offset, chunk.x, chunk.y);
 			// Convention: Display Color 0 on layers 0 and below.
@@ -228,10 +228,10 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		else {
 			if (current_shader != SPRITE) {
 				sprite_shader.use();
-				sprite_shader.set(sprite_slots.palette, palette->bind(1));
+				sprite_shader.set(sprite_slots.palette, bind(palette, 1));
 				sprite_shader.setCamera(world_camera);
 
-				glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+				glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 				glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 				glEnableVertexAttribArray(0);
 
@@ -260,7 +260,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 					|| sprites[sprite_order[lookahead]].spritesheet != ss) break;
 			}
 
-			sprite_shader.set(sprite_slots.spritesheet, const_cast<Texture*>(ss)->bind(0));
+			sprite_shader.set(sprite_slots.spritesheet, bind(const_cast<Spritesheet*>(ss), 0));
 
 			// sprite_vbo should already be bound at this point.
 #ifndef NDEBUG
@@ -292,7 +292,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		text_shader.use();
 		//text_shader.set(text_slots.layer, 500.f);
 
-		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 		glEnableVertexAttribArray(0);
 
@@ -355,7 +355,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 	if (show_console) {
 		overlay_shader.use();
 
-		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 		glEnableVertexAttribArray(0);
 
@@ -367,7 +367,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 		text_shader.set(text_slots.glyph_atlas, bind_font_glyph_atlas(simple_font, 0));
 		text_shader.set(text_slots.glyph_bounds, bind_font_glyph_table(simple_font, 1));
 
-		glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 		glEnableVertexAttribArray(0);
 
@@ -408,7 +408,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	scale_shader.use();
-	scale_shader.set(scale_slots.virtual_screen, framebuffer->bind(0));
+	scale_shader.set(scale_slots.virtual_screen, bind(framebuffer, 0));
 
 	// Determine the letterboxing ratio
 	float scale_x = (float) screen_width / (float) v_width;
@@ -420,7 +420,7 @@ void Renderer::draw_frame(float fps, bool show_fps, bool show_console, bool show
 	));
 	scale_shader.set(scale_slots.sharpness, max(scaling_sharpness, 0.f) * max_scale / 5.f);
 
-	glBindBuffer(GL_ARRAY_BUFFER, tile_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, rect_vbo);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
 	glEnableVertexAttribArray(0);
 
@@ -531,7 +531,7 @@ bool Renderer::remove_chunk(const ChunkID id) {
 }
 
 SpriteID  Renderer::add_sprite(
-	Texture* const spritesheet,
+	Spritesheet* const spritesheet,
 	float x, float y,
 	i32 layer,
 	i32 src_x, i32 src_y, i32 src_w, i32 src_h,
@@ -561,7 +561,7 @@ bool Renderer::remove_sprite(const SpriteID id) {
 }
 
 
-TileChunk::TileChunk(Texture* const tileset, Tile* const tilemap, u32 width, u32 height):
+TileChunk::TileChunk(Tileset* const tileset, Tile* const tilemap, u32 width, u32 height):
 	tileset(tileset),
 	tilemap(tilemap),
 	width(width),

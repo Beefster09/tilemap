@@ -36,43 +36,67 @@ static TextureBindingEntry boundTextures[16] = {
 	{nullptr, 0, 0},
 };
 
-/*Texture::Texture(const char* file) {
-	stbi_set_flip_vertically_on_load(true);
-	int width, height, nrChannels;
-	unsigned char *data = stbi_load(file, &width, &height, &nrChannels, 0);
+struct Texture {
+	GLuint tex_handle;
+	GLenum gl_type = GL_TEXTURE_2D;
+	int bound_slot = TEX_UNBOUND;
 
-	if (data) {
-		glGenTextures(1, &tex_handle);
-		glBindTexture(GL_TEXTURE_2D, tex_handle);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		auto fmt = (nrChannels == 4 ? GL_RGBA : GL_RGB);
-		auto sfmt = (nrChannels == 4 ? GL_SRGB_ALPHA : GL_SRGB);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, sfmt, width, height, 0, fmt, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		stbi_image_free(data);
+	Texture(GLuint tex, GLenum type) {
+		tex_handle = tex;
+		gl_type = type;
 	}
-	else {
-		printf("Unable to load texture '%s'\n", file);
-	}
-}*/
 
-Texture::Texture(GLuint tex, GLenum type) {
-	tex_handle = tex;
-	this->type = type;
+	int bind(int slot) {
+		if (bound_slot >= 0) {
+			boundTextures[bound_slot].lastBind = bindingNumber++;
+			boundTextures[bound_slot].bindCount++;
+			return bound_slot;
+		}
+		if (slot == TEX_AUTO) {
+			uint32_t oldest = UINT32_MAX;
+			for (int i = 0; i < 16; i++) {
+				if (boundTextures[i].tex) {
+					if (boundTextures[i].lastBind < oldest) {
+						slot = i;
+						oldest = boundTextures[i].lastBind;
+					}
+				}
+				else {
+					slot = i;
+					break;
+				}
+			}
+		}
+		if (boundTextures[slot].tex) {
+			boundTextures[slot].tex->evict();
+		}
+		assert(slot >= 0 && slot < 16);
+		bound_slot = slot;
+		boundTextures[slot] = { this, bindingNumber++, 1 };
+		glActiveTexture(GL_TEXTURE0 + slot);
+		glBindTexture(gl_type, tex_handle);
+		return slot;
+	}
+
+	void evict() {
+		boundTextures[bound_slot] = { nullptr, 0, 0 };
+		bound_slot = TEX_UNBOUND;
+	}
+};
+
+int bind(Texture* tex, int slot) {
+	return tex->bind(slot);
 }
 
-Texture::~Texture() {
-	glDeleteTextures(1, &tex_handle);
+Texture* make_texture(GLuint tex, GLenum type) {
+	return new Texture(tex, type);
 }
 
-Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int offset_y, int spacing_x, int spacing_y) {
+struct Tileset {
+	Texture tex;
+};
+
+Tileset* load_tileset(const char* image_file, int tile_size, int offset_x, int offset_y, int spacing_x, int spacing_y) {
 	stbi_set_flip_vertically_on_load(false);
 	int width, height, n_channels;
 	unsigned char *image_data = stbi_load(image_file, &width, &height, &n_channels, 0);
@@ -115,7 +139,9 @@ Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int o
 
 		delete[] tile_data;
 		stbi_image_free(image_data);
-		return new Texture(tex_handle, GL_TEXTURE_2D_ARRAY); // TODO? use an allocator and placement new?
+		return new Tileset{
+			Texture(tex_handle, GL_TEXTURE_2D_ARRAY)
+		};
 	}
 	else {
 		printf("Unable to load texture '%s'\n", image_file);
@@ -123,7 +149,15 @@ Texture* load_tileset(const char* image_file, int tile_size, int offset_x, int o
 	}
 }
 
-Texture* load_spritesheet(const char* image_file) {
+int bind(Tileset* ts, int slot) {
+	return ts->tex.bind(slot);
+}
+
+struct Spritesheet {
+	Texture tex;
+};
+
+Spritesheet* load_spritesheet(const char* image_file) {
 	stbi_set_flip_vertically_on_load(false);
 	int width, height, n_channels;
 	unsigned char *image_data = stbi_load(image_file, &width, &height, &n_channels, 0);
@@ -146,7 +180,9 @@ Texture* load_spritesheet(const char* image_file) {
 
 		delete[] spritesheet_data;
 		stbi_image_free(image_data);
-		return new Texture(tex_handle, GL_TEXTURE_RECTANGLE);
+		return new Spritesheet{
+			Texture(tex_handle, GL_TEXTURE_RECTANGLE)
+		};
 	}
 	else {
 		printf("Unable to load texture '%s'\n", image_file);
@@ -154,72 +190,50 @@ Texture* load_spritesheet(const char* image_file) {
 	}
 }
 
-int Texture::bind(int slot) {
-	if (bound_slot >= 0) {
-		boundTextures[bound_slot].lastBind = bindingNumber++;
-		boundTextures[bound_slot].bindCount++;
-		return bound_slot;
-	}
-	if (slot == TEX_AUTO) {
-		uint32_t oldest = UINT32_MAX;
-		for (int i = 0; i < 16; i++) {
-			if (boundTextures[i].tex) {
-				if (boundTextures[i].lastBind < oldest) {
-					slot = i;
-					oldest = boundTextures[i].lastBind;
-				}
-			}
-			else {
-				slot = i;
-				break;
-			}
-		}
-	}
-	if (boundTextures[slot].tex) {
-		boundTextures[slot].tex->evict();
-	}
-	assert(slot >= 0 && slot < 16);
-	bound_slot = slot;
-	boundTextures[slot] = {this, bindingNumber++, 1};
-	glActiveTexture(GL_TEXTURE0 + slot);
-	glBindTexture(type, tex_handle);
-	return slot;
+int bind(Spritesheet* ss, int slot) {
+	return ss->tex.bind(slot);
 }
 
-void Texture::evict() {
-	boundTextures[bound_slot] = {nullptr, 0, 0};
-	bound_slot = TEX_UNBOUND;
-}
+struct Palette {
+	Texture tex;
+	GLuint color_buffer;
+	int n_csets;
+	int cset_size;
+};
 
-//Palette::Palette(int csets, int cset_size): csets(csets), cset_size(cset_size), colors(csets * cset_size) {
-//	GLuint tex_handle;
-//	glGenTextures(1, &tex_handle);
-//	glBindTexture(GL_TEXTURE_2D, tex_handle);
-//
-//
-//
-//}
-
-Palette::Palette(std::initializer_list<std::initializer_list<Color>> color_data):
-	csets(color_data.size()),
-	cset_size(color_data.begin()->size())
-{
-	colors.reserve(csets * cset_size);
+Palette* make_palette(std::initializer_list<std::initializer_list<Color>> color_data) {
+	auto csets = color_data.size();
+	auto cset_size = color_data.begin()->size();
+	auto colors = alloc(Color, csets * cset_size);
+	int i = 0;
 	auto r_end = color_data.end();
 	for (auto row = color_data.begin(); row != r_end; row++) {
 		auto c_end = row->end();
 		for (auto cell = row->begin(); cell != c_end; cell++) {
-			colors.push_back(*cell);
+			colors[i++] = *cell;
 		}
 	}
 
+	GLuint color_buffer;
+	glGenBuffers(1, &color_buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, color_buffer);
+	glBufferData(GL_TEXTURE_BUFFER, sizeof(Color) * csets * cset_size, colors, GL_DYNAMIC_DRAW);
+
 	GLuint tex_handle;
 	glGenTextures(1, &tex_handle);
-	glBindTexture(GL_TEXTURE_RECTANGLE, tex_handle);
+	glBindTexture(GL_TEXTURE_BUFFER, tex_handle);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8, color_buffer);
 
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB, cset_size, csets, 0, GL_RGB, GL_UNSIGNED_BYTE, colors.data());
+	return new Palette{
+		Texture(tex_handle, GL_TEXTURE_BUFFER),
+		color_buffer,
+		(int) csets,
+		(int) cset_size
+	};
+}
 
-	new(&tex) Texture(tex_handle, GL_TEXTURE_RECTANGLE);
+int bind(Palette* p, int slot) {
+	return p->tex.bind(slot);
 }
 
 void sync() {

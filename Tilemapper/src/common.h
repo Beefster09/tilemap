@@ -32,12 +32,6 @@ constexpr float TAU = (float)(3.141592653589793238 * 2.0);
 
 int _logOpenGLErrors(const char* caller, const char* file, int lineNo);
 
-#ifdef NDEBUG
-#define logOpenGLErrors() do{}while(0)
-#else
-#define logOpenGLErrors() _logOpenGLErrors(__func__, __FILE__, __LINE__)
-#endif
-
 #define XY(VEC) VEC.x, VEC.y
 #define XZ(VEC) VEC.x, VEC.z
 #define XYZ(VEC) VEC.x, VEC.y, VEC.z
@@ -73,9 +67,11 @@ inline T clamp(T a, T lo = 0, T hi = 1) {
 #ifdef NDEBUG
 #define ERR_LOG(FMT, ...) do{}while(0)
 #define DBG_LOG(FMT, ...) do{}while(0)
+#define logOpenGLErrors() do{}while(0)
 #else
 #define ERR_LOG(FMT, ...) fprintf(stderr, "[%s (line %03d in %s)] " FMT "\n", __func__, __LINE__, __FILE_BASENAME__, __VA_ARGS__)
 #define DBG_LOG(FMT, ...) printf("[%s (line %03d in %s)] " FMT "\n", __func__, __LINE__, __FILE_BASENAME__, __VA_ARGS__)
+#define logOpenGLErrors() _logOpenGLErrors(__func__, __FILE_BASENAME__, __LINE__)
 #endif
 
 /// Allocate some bytes from temp storage
@@ -89,3 +85,5 @@ void temp_storage_clear();
 
 #define temp_alloc(TYPE, N) ((TYPE*) _temp_alloc(sizeof(TYPE) * N))
 #define temp_alloc0(TYPE, N) ((TYPE*) _temp_alloc0(sizeof(TYPE) * N))
+#define alloc(TYPE, N) ((TYPE*) malloc(sizeof(TYPE) * N))
+#define alloc0(TYPE, N) ((TYPE*) calloc(N, sizeof(TYPE)))

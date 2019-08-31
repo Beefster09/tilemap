@@ -18,14 +18,14 @@ struct Tile {
 };
 
 class TileChunk {
-	Texture* const tileset;
+	Tileset* const tileset;
 	Tile* const tilemap;
 	const u32 width;
 	const u32 height;
 	const GLuint vbo;
 
 public:
-	TileChunk(Texture* const tileset, Tile* const tilemap, u32 width, u32 height);
+	TileChunk(Tileset* const tileset, Tile* const tilemap, u32 width, u32 height);
 	~TileChunk();
 
 	inline Tile& at(u32 row, u32 col) {
@@ -53,7 +53,7 @@ struct SpriteAttributes {
 };
 
 struct Sprite {
-	Texture* spritesheet;
+	Spritesheet* spritesheet;
 	SpriteAttributes attrs;
 };
 
@@ -65,7 +65,7 @@ private:
 	GLFWwindow* const window;
 	int v_width, v_height; // virtual resolution
 
-	GLuint vao, fbo, tile_vbo, sprite_vbo, text_vbo;
+	GLuint vao, fbo, rect_vbo, sprite_vbo, text_vbo;
 	Shader tile_shader, scale_shader, sprite_shader, text_shader, overlay_shader;
 
 #define __SLOT(VAR) int VAR;
@@ -114,7 +114,7 @@ public:
 	bool remove_chunk(const ChunkID id);
 
 	SpriteID add_sprite(
-		Texture* const spritesheet,
+		Spritesheet* const spritesheet,
 		float x, float y,
 		i32 layer,
 		i32 src_x, i32 src_y, i32 src_w, i32 src_h,
