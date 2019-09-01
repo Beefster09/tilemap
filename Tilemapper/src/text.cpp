@@ -170,7 +170,7 @@ static KerningData create_kern_table(const KernPair* const kern_pairs, const uns
 	// Get next largest power of 2 beyond a 80% load factor
 	u32 capacity = 1 << (32 - __lzcnt(n_kern_pairs * 10 / 8)); // TODO: make this more portable
 	u32 mask = capacity - 1;
-	auto table_data = (KernTableEntry*)calloc(capacity, sizeof(KernTableEntry));
+	auto table_data = alloc0(KernTableEntry, capacity);
 	KerningData out = { table_data, capacity, __lzcnt64((u64) mask), 0 };
 	for (int i = 0; i < n_kern_pairs; i++) {
 		kern_table_insert(out, kern_pairs[i]);
@@ -360,19 +360,11 @@ void init_simple_font() {
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	u32 glyph_bounds[(ASCII_SIZE + 1) * 4];
+	struct { int x, y, w, h; } glyph_bounds[(ASCII_SIZE + 1) * 4];
 	for (int i = 0; i < ASCII_SIZE; i++) {
-#define SET_GLYPH_ATTR(NAME, OFFSET) glyph_bounds[4 * i + OFFSET] = simple_font.ascii_glyphs[i].src_ ## NAME;
-		SET_GLYPH_ATTR(x, 0);
-		SET_GLYPH_ATTR(y, 1);
-		SET_GLYPH_ATTR(w, 2);
-		SET_GLYPH_ATTR(h, 3);
-#undef SET_GLYPH_ATTR
+		glyph_bounds[i] = REPACK4(simple_font.ascii_glyphs[i], src_x, src_y, src_w, src_h);
 	}
-	glyph_bounds[4 * CURSOR_GLYPH_ID + 0] = simple_font.cursor.src_x;
-	glyph_bounds[4 * CURSOR_GLYPH_ID + 1] = simple_font.cursor.src_y;
-	glyph_bounds[4 * CURSOR_GLYPH_ID + 2] = simple_font.cursor.src_w;
-	glyph_bounds[4 * CURSOR_GLYPH_ID + 3] = simple_font.cursor.src_h;
+	glyph_bounds[CURSOR_GLYPH_ID] = REPACK4(simple_font.cursor, src_x, src_y, src_w, src_h);
 
 	GLuint table_buffer;
 	glGenBuffers(1, &table_buffer);
@@ -380,7 +372,7 @@ void init_simple_font() {
 	glBufferData(GL_TEXTURE_BUFFER, sizeof(glyph_bounds), (void*)glyph_bounds, GL_STATIC_DRAW);
 
 	glBindTexture(GL_TEXTURE_BUFFER, table);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, table_buffer);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32I, table_buffer);
 
 	simple_font.glyph_atlas = make_texture(atlas, GL_TEXTURE_RECTANGLE);
 	simple_font.glyph_table = make_texture(table, GL_TEXTURE_BUFFER);

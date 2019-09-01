@@ -99,12 +99,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			}
 			return;
 		}
+		goto regular_keypress;
 	case GLFW_KEY_GRAVE_ACCENT:
 		if (action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
 			console_active = !console_active;
 			return;
 		}
+		// drop-thru intentional
 	default:
+		regular_keypress:
 		if (console_active && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
 			console_type_key(key | (mods << GLFW_TO_CONSOLE_SHIFT));
 		}

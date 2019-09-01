@@ -137,7 +137,7 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuf, 0);
 	framebuffer = make_texture(framebuf, GL_TEXTURE_2D);
 
-	sprite_attrs = (SpriteAttributes*)calloc(SPRITE_MAX, sizeof(SpriteAttributes));
+	sprite_attrs = alloc0(SpriteAttributes, SPRITE_MAX);
 	//glGenBuffers(1, &sprite_vbo); // done earlier
 	glBindBuffer(GL_ARRAY_BUFFER, sprite_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(SpriteAttributes) * SPRITE_MAX, sprite_attrs, GL_STREAM_DRAW); // reserve GPU memory
@@ -146,11 +146,11 @@ Renderer::Renderer(GLFWwindow* window, int width, int height):
 	glBindBuffer(GL_ARRAY_BUFFER, text_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(GlyphRenderData) * GLYPH_MAX, sprite_attrs, GL_STREAM_DRAW); // reserve GPU memory
 
-	temp_string_storage = (char*)malloc(STRING_STORAGE_SIZE);
+	temp_string_storage = alloc(char, STRING_STORAGE_SIZE);
 	string_storage_next = temp_string_storage;
-	print_later_ws_start = (GlyphPrintData*)malloc(sizeof(GlyphPrintData) * PRINT_CMD_WS_MAX);
+	print_later_ws_start = alloc(GlyphPrintData, PRINT_CMD_WS_MAX);
 	print_later_ws = print_later_ws_start;
-	print_later_ss_start = (GlyphPrintData*)malloc(sizeof(GlyphPrintData) * PRINT_CMD_SS_MAX);
+	print_later_ss_start = alloc(GlyphPrintData, PRINT_CMD_SS_MAX);
 	print_later_ss = print_later_ss_start;
 
 	ui_camera = glm::ortho(0.f, (float) width, 0.f, (float) height, 1024.f, -1024.f);

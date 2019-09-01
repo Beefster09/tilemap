@@ -16,7 +16,7 @@ char* readFile(const char* filename) {
 	fseek(file, 0, SEEK_END);
 
 	size_t fsize = ftell(file);
-	char* buffer = new char[fsize + 1];
+	char* buffer = alloc(char, fsize + 1);
 
 	fseek(file, 0, SEEK_SET);
 	if (fread(buffer, 1, fsize, file) == fsize) {
@@ -24,7 +24,7 @@ char* readFile(const char* filename) {
 		return buffer;
 	}
 	else {
-		delete[] buffer;
+		free(buffer);
 		return nullptr;
 	}
 }
@@ -174,7 +174,7 @@ thread_local char* temp_storage_current = nullptr;
 
 void* _temp_alloc(size_t n_bytes) {
 	if (TEMP_STORAGE == nullptr) {
-		temp_storage_current = TEMP_STORAGE = (char*) malloc(TEMP_STORAGE_SIZE);
+		temp_storage_current = TEMP_STORAGE = alloc(char, TEMP_STORAGE_SIZE);
 		assert(TEMP_STORAGE && "Unable to initialize temp storage.");
 	}
 	if (n_bytes == 0) return nullptr;
@@ -193,6 +193,7 @@ void* _temp_alloc(size_t n_bytes) {
 
 void* _temp_alloc0(size_t n_bytes) {
 	void* mem = _temp_alloc(n_bytes);
+	if (mem == nullptr) return nullptr;
 	memset(mem, 0, n_bytes);
 	return mem;
 }

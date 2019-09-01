@@ -196,6 +196,7 @@ int bind(Spritesheet* ss, int slot) {
 
 struct Palette {
 	Texture tex;
+	Color* color_data;
 	GLuint color_buffer;
 	int n_csets;
 	int cset_size;
@@ -208,6 +209,7 @@ Palette* make_palette(std::initializer_list<std::initializer_list<Color>> color_
 	int i = 0;
 	auto r_end = color_data.end();
 	for (auto row = color_data.begin(); row != r_end; row++) {
+		assert(row->size() == cset_size && "Initializer list for palette is jagged!");
 		auto c_end = row->end();
 		for (auto cell = row->begin(); cell != c_end; cell++) {
 			colors[i++] = *cell;
@@ -226,6 +228,7 @@ Palette* make_palette(std::initializer_list<std::initializer_list<Color>> color_
 
 	return new Palette{
 		Texture(tex_handle, GL_TEXTURE_BUFFER),
+		colors,
 		color_buffer,
 		(int) csets,
 		(int) cset_size
@@ -236,6 +239,7 @@ int bind(Palette* p, int slot) {
 	return p->tex.bind(slot);
 }
 
-void sync() {
-
+void sync(Palette* p) {
+	glBindBuffer(GL_TEXTURE_BUFFER, p->color_buffer);
+	glBufferSubData(GL_TEXTURE_BUFFER, 0, sizeof(Color) * p->n_csets * p->cset_size, p->color_data);
 }

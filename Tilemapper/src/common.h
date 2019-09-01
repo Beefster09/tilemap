@@ -36,6 +36,10 @@ int _logOpenGLErrors(const char* caller, const char* file, int lineNo);
 #define XZ(VEC) VEC.x, VEC.z
 #define XYZ(VEC) VEC.x, VEC.y, VEC.z
 
+#define REPACK2(OBJ, A, B)       {(OBJ).A, (OBJ).B}
+#define REPACK3(OBJ, A, B, C)    {(OBJ).A, (OBJ).B, (OBJ).C}
+#define REPACK4(OBJ, A, B, C, D) {(OBJ).A, (OBJ).B, (OBJ).C, (OBJ).D}
+
 #define BIT(B) (1ULL << (B))
 #define BITOF(X, B) ((X) & BIT(B))
 #define BITSET(X, B) ((X) |= BIT(B))
